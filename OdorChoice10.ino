@@ -101,8 +101,6 @@
 // #define CNLPTm  // Check Now Loop Time it was 0!!
 // Define default values for any params that need them for user convenience
 
-// xxxTm SET FOR FASTER DEBUGGING
-
 #define dfCWT 2500  // default Choice Wait Time (W)
 #define dfITI 2000  // (I)
 #define dfMinNumLicks 5   // set with param (L)
@@ -223,7 +221,7 @@ bool SyncPol = dfSyncPol;   // Sync polarity
 bool GoTime = false;        // It's time to start a trial, could go true during reporting. Does it matter?                           
 bool TrialRunning = false;  // true while a trial is running, to the end
 bool TrialDone = false;     // a trial is completed and ready to report when true
-                                // returns to false when trial report has completed
+                            // returns to false when trial report has completed
 // Lick stuff
 int MxLkTm = dfMxLkTm;
 
