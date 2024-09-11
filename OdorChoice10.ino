@@ -1,4 +1,4 @@
-// Odor Choice Trial  (C) Gavin Perry May - Sep 2024
+// Odor Choice Trial  (C) Gavin Perry May 2024
 // Program to take serial input parameters from a Matlab program,
 // Perform the requested trial while collecting data
 // Return real time data to the Matlab program, no Report, let MatLab handle that
@@ -87,7 +87,8 @@
 
 //================================ ATTENTION!!=========================
 // loop (0) to do most of USB communication
-// loop 1 does the trials and some quick (lick) com. 
+// loop 1 does the trials an some quick com. if this isn't working flag loop to do all the talking YUCK!
+// Getting a lick locks it up! no 0 at end of trial
 //====================================================================================
 
 // #include <Libraries>  use "MyLib.h" if any headers in the local dir
@@ -100,6 +101,8 @@
 // #define DEBUG2 // verbose, mostly for testing handshake to ML
 // #define CNLPTm  // Check Now Loop Time it was 0!!
 // Define default values for any params that need them for user convenience
+
+// xxxTm SET FOR FASTER DEBUGGING
 
 #define dfCWT 2500  // default Choice Wait Time (W)
 #define dfITI 2000  // (I)
@@ -221,7 +224,7 @@ bool SyncPol = dfSyncPol;   // Sync polarity
 bool GoTime = false;        // It's time to start a trial, could go true during reporting. Does it matter?                           
 bool TrialRunning = false;  // true while a trial is running, to the end
 bool TrialDone = false;     // a trial is completed and ready to report when true
-                            // returns to false when trial report has completed
+                                // returns to false when trial report has completed
 // Lick stuff
 int MxLkTm = dfMxLkTm;
 
@@ -485,6 +488,7 @@ bool ExecuteTrial() { // MatLab RunTrial
   EndTm = millis();  // End of tone, count licks  EndTm needed (for debug only?)
 
 // Lick count is more complex, need to check inter lick interval to find a burst of N licks
+// New V11 - An error is only counted when the lick count threshold is passed on the wrong side. 
   while ((millis() - EndTm) < CWT) {
       // Count Licks during CWT with LickCountL and LickCountR
 
