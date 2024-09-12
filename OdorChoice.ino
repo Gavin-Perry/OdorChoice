@@ -452,7 +452,7 @@ bool ExecuteTrial() { // MatLab RunTrial
         IsError = true;
         if (!NoCountErr) break;
 #ifdef DEBUG
-        Serial.print("#Error ");
+        Serial.print("#Error L ");
         Serial.println(millis());
 #endif 
       } else {
@@ -462,6 +462,22 @@ bool ExecuteTrial() { // MatLab RunTrial
         break;  // Got reward don't need to wait, only one reward
       }  
     } 
+        if (LickCountR >= MinNumLicks) {  // enough licks on Left to classify as choice
+      if ((RewRA + RewRB) == 0) {  // it's Air, this is an error
+        IsError = true;
+        if (!NoCountErr) break;
+#ifdef DEBUG
+        Serial.print("#Error R");
+        Serial.println(millis());
+#endif 
+      } else {
+        if (RewRA > 0)                // Give A if that's the one spec'd
+         GiveReward(RewRightA, RewRA);          //
+        else GiveReward(RewRightB, RewRB);
+        break;  // Got reward don't need to wait, only one reward
+      }  
+    } 
+
   }  // end of while CWT
 #ifdef DEBUG
   Serial.print("#End CWT");
@@ -622,15 +638,19 @@ void GiveReward(byte RewLoc, byte Drops) {  //  RewPin, # of drops
   switch (RewLoc) {
     case RewLeftA:
       Serial.print("A");   
+      Serial.print("#A"); // For debugger
       break;
     case RewLeftB:
       Serial.print("B");
+      Serial.print("#B"); // For debugger
       break;
     case RewRightA:
       Serial.print("C");
+      Serial.print("#C"); // For debugger
       break;
     case RewRightB:
       Serial.print("D");
+      Serial.print("#D"); // For debugger
       break;
   }  // end switch
   Serial.println(RwTm);
