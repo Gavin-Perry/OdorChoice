@@ -638,19 +638,15 @@ void GiveReward(byte RewLoc, byte Drops) {  //  RewPin, # of drops
   switch (RewLoc) {
     case RewLeftA:
       Serial.print("A");   
-      Serial.print("#A"); // For debugger
       break;
     case RewLeftB:
       Serial.print("B");
-      Serial.print("#B"); // For debugger
       break;
     case RewRightA:
       Serial.print("C");
-      Serial.print("#C"); // For debugger
       break;
     case RewRightB:
       Serial.print("D");
-      Serial.print("#D"); // For debugger
       break;
   }  // end switch
   Serial.println(RwTm);
