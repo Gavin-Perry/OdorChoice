@@ -47,8 +47,7 @@
 
 //================================ ATTENTION!!=========================
 // loop (0) to do most of USB communication
-// loop 1 does the trials an some quick com. if this isn't working flag loop to do all the talking YUCK!
-// Getting a lick locks it up! no 0 at end of trial
+// loop 1 does the trials and some quick com.
 //====================================================================================
 
 // #include <Libraries>  use "MyLib.h" if any headers in the local dir
@@ -59,10 +58,7 @@
 // Debugging levels set here
 #define DEBUG  // if defined, debug code is compiled in -- Comment out for no debug code
 // #define DEBUG2 // verbose, mostly for testing handshake to ML
-// #define CNLPTm  // Check Now Loop Time it was 0!!
 // Define default values for any params that need them for user convenience
-
-// xxxTm SET FOR FASTER DEBUGGING
 
 #define dfCWT 2500  // default Choice Wait Time (W)
 #define dfITI 2000  // (I)
@@ -181,10 +177,10 @@ bool SyncPol = dfSyncPol;   // Sync polarity
 // Probably a waste of time and can be simplified ???
 // e.g. reporting data from last trial while ITI can start in the next
 //  VERIFY Did I get this right?
-bool GoTime = false;        // It's time to start a trial, could go true during reporting. Does it matter?                           
+bool GoTime = false;        // It's time to start a trial                          
 bool TrialRunning = false;  // true while a trial is running, to the end
 bool TrialDone = false;     // a trial is completed and ready to report when true
-                                // returns to false when trial report has completed
+                            // returns to false when trial report has completed
 // Lick stuff
 int MxLkTm = dfMxLkTm;
 
