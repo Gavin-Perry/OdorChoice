@@ -613,7 +613,7 @@ void ValveTest(int rate) {  // click each valve at rate (0.1 sec units)
     digitalWrite(RewRightB, HIGH);
     delay (rate);   
     digitalWrite(RewRightB, LOW);
-    //*/
+    //*/RwTm
 } // end ValveTest
 
 void GiveReward(byte RewLoc, byte Drops) {  //  RewPin, # of drops
@@ -715,14 +715,13 @@ void LickRISR() {
 // V7 save it for Completion routine
     NewLickRightTm = millis();
     WasLastLickLeft = false;   // This one on the right
-    NewLickRight = true;
+    NewLickRight = true;  // There is a new lick to be processed
   }
   // else too fast, ignore it.
 }
 
 void SyncInISR() {  // Sync from microscope, time stamp it
-  Serial.print('s');
-  Serial.println(millis());
+  Serial.printf("s%lu\r\n",millis());
 }
 
 void SetALLlow() {                  //Set all output pins low (when forcing stop)
@@ -740,10 +739,14 @@ void CheckNow() {
   //  handle immediate status updates to MatLab
   // Keep track of both L&R lick counts, check inter lick interval to find a burst of N licks
   // ExecuteTrial during CWT decides what to do about a burst and resets counts as needed.
+
+/*/ Can't do this!
   if (Rewarding) {  // Busy giving rewards, so ignore licks for now
     NewLickLeft = false;
     NewLickRight = false; 
   }
+  Instead atomic the letter and time going out
+//*/  
     if (NewLickLeft) {  // See if it's legit and put it in the list
   // Check for lick count for reward, NoCountErr means wrong side is OK
   // RewEvery rewards every lick
@@ -766,8 +769,9 @@ void CheckNow() {
       WasLastLickLeft = true; // This one was left side, not right 
       // Get set for next lick
       LastLickLeftTm = NewLickLeftTm; // Saved NewLick so can allow next ISR
-      Serial.print("L");   // report the lick to MatLab  
-      Serial.println(LastLickLeftTm);  // and when it happened (a while ago!)
+      // pause the other processor
+      Serial.printf("L%lu\r\n",LastLickLeftTm);   // report the lick to MatLab  
+                //  when it happened (a while ago!)
       if (RewEvery) { // Every lick is a winner! 
   #ifdef DEBUG2   
       Serial.print("#Reward Every");
@@ -805,9 +809,7 @@ void CheckNow() {
       }
       WasLastLickLeft = false; // This one was right side
       LastLickRightTm = NewLickRightTm; // Saved NewLick so can allow next ISR
-      Serial.print("R");   // report the lick to MatLab  
-      Serial.println(LastLickRightTm);  // and when it happened
-
+      Serial.printf("R%lu\r\n",LastLickRightTm);   // report the lick to MatLab  
       if (RewEvery) { // Every lick is a winner! But don't overlap them,
       // Wait reward time before next lick, i.e. ignoring licks during reward of course
       // But what about last lick? Keep going or have a pause
@@ -928,22 +930,22 @@ if (isLowerCase(Cmd)) {
 #ifdef DEBUG
     case 'r':  // Tell all param values (I had to get matlab to check for multiple line responses)
       Serial.printf(
-"#params: ITI %d, OdorTm %d, CWTm %d, OdorL %d, OdorR %d, RLA %d, RLB %d, RRA %d, RRB %d\r\n",
+"#params: ITI %u, OdorTm %u, CWTm %u, OdorL %u, OdorR %u, RLA %u, RLB %u, RRA %u, RRB %u\r\n",
          ITI, OdorTm, CWT, OdorL, OdorR, RewLA, RewLB, RewRA, RewRB);
       if (val>=2) {  // Tell me more
         Serial.printf( 
-          "#more: MxDrp %d, DropTm %d, RwEv %d, NoCErr %d, SPol %d, TnTm %d, BzTm %d, EndTm %d\r\n",
+          "#more: MxDrp %u, DropTm %u, RwEv %u, NoCErr %u, SPol %u, TnTm %u, BzTm %u, EndTm %u\r\n",
           MaxDrops, DropTm, (RewEvery + RewEvA), NoCountErr, SyncPol, ToneTm, BuzzTm, EndTm);
       }    
       if (val>=3) { // Even more debugging details
         Serial.printf( 
-          "#Licks: NLLTm %d, NLRTm %d, LLTm %d, LRTm %d, WasLLL %d, Err %d, LCt %d, RCt %d, MinL %d\r\n",
+          "#Licks: NLLTm %u, NLRTm %u, LLTm %u, LRTm %u, WasLLL %u, Err %u, LCt %u, RCt %u, MinL %u\r\n",
          NewLickLeftTm, NewLickRightTm, LastLickLeftTm, LastLickRightTm, WasLastLickLeft, IsError,
          LickCountL, LickCountR, MinNumLicks);
       }   
       if (val >= 4) {
         Serial.printf( 
-          "#TrlBs  GoTm %d, TRun %d, TDone %d isMP %d\r\n", 
+          "#TrlBs  GoTm %u, TRun %u, TDone %u isMP %u\r\n", 
           GoTime, TrialRunning, TrialDone, isMatLabPresent);
       }    
       break;
@@ -968,26 +970,26 @@ if (isLowerCase(Cmd)) {
                 // Trial will end itself,so wait, then do ValveCheck
       FinTrlTm = millis();
 #ifdef DEBUG
-      Serial.printf("#Stopping at %d\r\n",FinTrlTm);
+      Serial.printf("#Stopping at %u\r\n",FinTrlTm);
 #endif
       while (TrialRunning) {             //waiting for trial to finish... but not forever
-        if ((millis() - FinTrlTm) > 12000)  // is 12 seconds long enough???
+        if ((millis() - FinTrlTm) > 8000)  // is 8 seconds long enough to finiah any trial???
           break;                         // call it
       }
       if (!TrialRunning)
         TrialDone = true; // ready to report it (not here, unneeded var for cleanup)
       else
-        Serial.printf("x%d\r\n",FinTrlTm);  // Tell MatLab we quit mid trial 
+        Serial.printf("x%u\r\n",FinTrlTm);  // Tell MatLab we quit mid trial 
 
       TrialRunning = false;  // Declare false to get out of broken loop
 //      ValveTest(1);    // Let user run the valve check of just fo it???
-      break; // end of 'x'  It's a long one!
+      break; // end of 'x'  It's long one if we were hung!
     case 'z' :  // Do Buzzer
       ErrorBuzz(val);  // val is Error# 0 - no E
       break;
     default:  // got a different lower case letter
 #ifdef DEBUG
-      Serial.printf("#Bad Command %c dec:%d \r\n",Cmd,int(Cmd));
+      Serial.printf("#Bad Command %c dec:%u \r\n",Cmd,int(Cmd));
 #endif
       break;
 
@@ -1129,7 +1131,7 @@ bool ReadCmds(char Cmd) {  // Keep reading rest of command string until G is giv
       }
 // At this point it's probably a number but check everything printable      
       if (isPrintable(Cmd)) {   //  tell me about it, what did I miss?
-        Serial.printf("#Input error: %c %d \r\n",Cmd,val);
+        Serial.printf("#Input error: %c %u \r\n",Cmd,val);
         Cmd = 0;  // Clear it
         return false;    // not a valid trial get out of here
       }

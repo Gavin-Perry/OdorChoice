@@ -1,4 +1,4 @@
-# Change log for first 10 versions
+# Change log for OdorChoice Pico program
 // Version 1.0 5/3/24  Outline procs needed and initial trial code, test hardware
 // Version 2.0 5/31/24
 //     use 2 74HC595 for 16 expansion bits
@@ -41,3 +41,6 @@
 // GP0 is Left Odor 1 on PCB had to switch Left #s
 // thus fix OpenOdorValves and CloseOdorValves
 // Fix crossed wires on PCB 1.0
+// 9/14/24
+// Getting occasional 0 times for licks. Suspect crashing messages from Pico
+// converted print("c"); println(val); to printf("c%iu",val); to see if L 0 and R 0 stop happening
