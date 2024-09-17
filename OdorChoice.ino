@@ -1,4 +1,4 @@
-// Odor Choice Trial  (C) Gavin Perry May 2024
+// Odor Choice Trial  (C) Gavin Perry May 2024 - Sep 2024
 // Program to take serial input parameters from a Matlab program,
 // Perform the requested trial while collecting data
 // Return real time data to the Matlab program, no Report, let MatLab handle that
@@ -25,7 +25,8 @@
 //  E F L O R S s U V W X x Y Z z  (S start is ITI start)
 // x is stopping a trial
 // Moved issue tracking to GitHub (ssh) git@github.com:Gavin-Perry/OdorChoice.git
-
+// v12  Changed print(); println(); to printf("%c%u\r\n",Type,millis()) as needed
+// Saved text file
 //=================================
 // TO DO
 //  TEST!!!!
@@ -406,15 +407,13 @@ bool ExecuteTrial() { // MatLab RunTrial
   Serial.println("#GO");
 #endif
   StartTm = millis();  // Start of this trial. Does anyone care later?
-  Serial.print('S');
-  Serial.println(StartTm);
+  Serial.printf("%c%u\r\n",'S',StartTm);
   OpenAirVac();              // Clear last odors
   if ((ITI - PostSync) > 0)  // if ITI < 2 sec, skip it
     delay(ITI - PostSync);   // wait out the ITI time (minus 2 sec)
   DoSyncPulse();
 #ifdef DEBUG
-  Serial.print('Y');         // tell Sync
-  Serial.println(millis());
+  Serial.printf("%c%u\r\n",'Y',millis());         // tell Sync
 #endif 
   delay(PostSync);  // wait for microscope to start
   CloseAirVac();
@@ -429,8 +428,7 @@ bool ExecuteTrial() { // MatLab RunTrial
   delay (ToneTm);  // Tone is async so have to wait
   // What about licks of Air (Errors?) during or before Odors
   IsError = false;  // A fresh start on errors after tone to start CWT
-  Serial.print('W');
-  Serial.println(millis());
+  Serial.printf("%c%u\r\n",'W',millis());
 #ifdef DEBUG
   Serial.print("#CWT ");
   Serial.println(millis());
@@ -490,18 +488,15 @@ bool ExecuteTrial() { // MatLab RunTrial
   } // error
   else {  // no full choice made, incomplete trial (-1)
     if ((LickCountL<MinNumLicks) && (LickCountR<MinNumLicks) ) { // Not rewarded ignored trial
-      Serial.print('X');       // Report trial ignored, and time
-      Serial.println(millis());
+      Serial.printf("%c%u\r\n",'X'millis());       // Report trial ignored, and time
     } 
   }
   delay(EndSync);    // shorter time than before trial, but some wait before m'scope off??
   DoSyncPulse();
-  Serial.print('Z');  // Sync for microscope off report
-  Serial.println(millis());
+  Serial.printf("%c%u\r\n",'Z',millis());  // Sync for microscope off report
   delay(20);  // Why not give a bit of time after the pulse (Is microscope going to pulse again?)
   TrialRunning = false;  // Pico knows Trial is finished
-  Serial.print('z');  //  Tell Matlab to save data and go to next trial.
-  Serial.println(millis());
+  Serial.printf("%c%u\r\n",'z',millis());  //  Tell Matlab to save data and go to next trial.
   return true;       //
 }  // True if successful, possible False on timeout or other failure, not implemented yet
 // end ExecuteTrial
@@ -516,8 +511,7 @@ void OpenAirVac() {
   digitalWrite(AirL, HIGH);
   digitalWrite(AirR, HIGH);
   digitalWrite(VAC, HIGH);
-  Serial.print("U"); //  U open; V close
-  Serial.println(millis());
+  Serial.printf("%c%u\r\n",'U',millis()); //  U open; V close
 }
 
 void CloseAirVac() {
@@ -525,8 +519,7 @@ void CloseAirVac() {
   digitalWrite(AirR, LOW);
   delay(100);
   digitalWrite(VAC, LOW);
-  Serial.print("V");
-  Serial.println(millis());
+  Serial.printf("%c%u\r\n",'V',millis()); // 
 }
 
 void OpenOdorValves(byte Lft, byte Rt) {
@@ -552,8 +545,7 @@ void OpenOdorValves(byte Lft, byte Rt) {
     digitalWrite(Lft-1, HIGH);  
   }
 #ifdef  DEBUG
-  Serial.print('O');  // Odors On ?
-  Serial.println(millis());
+  Serial.printf("%c%u\r\n",'O',millis()); // 
 #endif  
 }
 
@@ -575,8 +567,7 @@ void CloseOdorValves(byte Lft, byte Rt) {
   else {
     digitalWrite(Lft-1, LOW); // GP0 - 9  Version 10
   }  
-  Serial.print('F');  // Odors off
-  Serial.println(millis());
+  Serial.printf("%c%u\r\n",'F',millis());  // Odors off
 }
 
 void ValveTest(int rate) {  // click each valve at rate (0.1 sec units)
@@ -635,7 +626,7 @@ void GiveReward(byte RewLoc, byte Drops) {  //  RewPin, # of drops
      delay(DropDelay);
 
 // Tell which reward was given
-  switch (RewLoc) {
+  switch (RewLoc) {  // ???? Does this need printf()?
     case RewLeftA:
       Serial.print("A");   
       break;
@@ -682,8 +673,7 @@ void GiveReward(byte RewLoc, byte Drops) {  //  RewPin, # of drops
 void ErrorBuzz(int ErrNum) {  // actually only 1 kind of error in this program
   tone(BUZZER_PIN, Buzz, BuzzTm);  // 
   if (ErrNum >0) {  // Buzz without E code, for z Buzz test
-    Serial.print('E');
-    Serial.println(millis());
+  Serial.printf("%c%u\r\n",'E',millis()); // 
 //    Serial.print("# Error#");
 //    Serial.println(ErrNum);
   } 
