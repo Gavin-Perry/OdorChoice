@@ -27,6 +27,10 @@
 // Moved issue tracking to GitHub (ssh) git@github.com:Gavin-Perry/OdorChoice.git
 // v12  Changed print(); println(); to printf("%c%u\r\n",Type,millis()) as needed
 // Saved text file
+// for ML v16
+//  Remove bool Rewarding, make all prints atomc printf()
+//  Shorten Serial Timeout to 20ms
+//  Fixed Fail (Error) trials to proper # of licks
 //=================================
 // TO DO
 //  TEST!!!!
@@ -67,7 +71,7 @@
 #define dfMxLkTm 500        // Maximum time between licks to stay in burst
 #define dfDropTm 25         // msec set by param (U)
 #define dfDropDelay 150     // InterDrop Interval  Minimum value is 50 see ReadCmd 'H'
-#define dfRewEvSpaceTm 500  // Delay before next freebie lick with RewEvery
+#define dfRewEvSpaceTm 20   // Delay before next freebie lick with RewEvery
 #define dfOdorTm 2000       // ms of odor on (T)
 #define dfSyncPol 1         // Low to high (S)
 #define dfToneTm 200        // Set default tone (Note) duration (Y)
@@ -170,7 +174,6 @@ bool NewLickLeft = false;      // Unreported lick on the left?
 bool NewLickRight = false;     // Unreported lick on the right?
 bool IsFirstLick = true;       // Ignore was last lick on first of burst
 bool WasLastLickLeft = false;  // true if the last lick was on the left
-bool Rewarding = false;        // Busy giving rewards, ignore licks
 bool SyncPol = dfSyncPol;      // Sync polarity
 
 // Trial managment flags to communicate between processors
@@ -255,7 +258,7 @@ void setup() {
     isMatLabPresent = CheckID();  // Retry again each CheckID is 10 sec
     while (!isMatLabPresent) {    // Still missing?
 #ifdef DEBUG
-      Serial.print("#Missed CheckID ");
+      Serial.println("#Missed CheckID ");
 #endif
       isMatLabPresent = CheckID();  // Retry for 20 seconds (each CheckID is 5 sec?)
                                     // different flash code for this problem
@@ -296,10 +299,10 @@ void setup() {
   delay(200);                      // tone is Non-blocking, so wait
   tone(BUZZER_PIN, Note, 100);     // generates a 100ms  beep note A6
                                    // Need this when MatLab runs it?  (Should always give a value)
-  Serial.setTimeout(50);           // Doing Serial.Available so only times out when no val sent
+  Serial.setTimeout(20);           // Doing Serial.Available so only times out when no val sent
   digitalWrite(LED_BUILTIN, LOW);  // Setup complete
 #ifdef DEBUG
-  delay(500);
+  delay(100);
   Serial.print("#Setup done at ");
   Serial.println(millis());
 #endif
@@ -307,9 +310,7 @@ void setup() {
 
 // Start second processor
 void setup1() {  // nothing needed to set up loop1??
-                 // Maybe init some default variables for "warm" boot if there is such a thing???
-                 // Is loop1 stepping on setup() prints?
-                 // Need to wait for setup to finish before loop 1 starts?
+                 // Init some default variables for re-boot
   ITI = dfITI;
   CWT = dfCWT;
   OdorTm = dfOdorTm;
@@ -323,6 +324,7 @@ void setup1() {  // nothing needed to set up loop1??
 
 //*****************************************
 // Loop for first processor,  Watch for commands and set params
+// does the heartbeat when trial is NOT running
 //    handle Serial IO with Matlab, that's a USB function)
 void loop() {                       // Need this loop fast as it process completion routines for licks
   CheckNow();                       // Look for commands and interrupts (licks) completed
@@ -341,7 +343,7 @@ void loop() {                       // Need this loop fast as it process complet
   }
 }  // end loop
 
-//========================================
+//==================Loop1 stops heartbeat, runs the trials ======================
 void loop1() {
   while (first) {  // Waiting for Proc0
     delay(10);
@@ -362,7 +364,7 @@ void ToggleLED() {
   digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));  // Toggle LED
 }
 
-// ---------------------- for setup() and loop() if needed ----------------
+// ---------------------- for setup() and loop()  ----------------
 // Wait for a char from ML, read it, if it's idChar reply #1, wait for ackChar
 // Keep checking for 10 seconds before complaining.
 // We know there is a serial connection so this shouldn't be needed more than once
@@ -429,8 +431,7 @@ bool ExecuteTrial() {  // MatLab RunTrial
   IsError = false;  // A fresh start on errors after tone to start CWT
   Serial.printf("%c%u\r\n", 'W', millis());
 #ifdef DEBUG
-  Serial.print("#CWT ");
-  Serial.println(millis());
+  Serial.printf("#CWT %u\r\n",millis());
 #endif
   // check if licks added to list since odors presented
   // Do any count as errors?
@@ -445,11 +446,10 @@ bool ExecuteTrial() {  // MatLab RunTrial
     // Enough Licks to count as a decision? (MinNumLicks)
     // Check if a reward should be given or an error counted
     if (LickCountL >= MinNumLicks) {                // enough licks on Left to classify as choice
-      if (!NoCountErr && ((RewLA + RewLB) == 0)) {  // it's Air, this is an error
+      if (!NoCountErr && (OdorL == 0)) {  // it's Air, this is an error
         IsError = true;
 #ifdef DEBUG
-        Serial.print("#Error L ");
-        Serial.println(millis());
+        Serial.printf("#Error L %u\r\n",millis());
 #endif
         if (!NoCountErr) break;
       } else {
@@ -460,11 +460,10 @@ bool ExecuteTrial() {  // MatLab RunTrial
       }
     }                                               // L>M?
     if (LickCountR >= MinNumLicks) {                // enough licks on Left to classify as choice
-      if (!NoCountErr && ((RewRA + RewRB) == 0)) {  // it's Air, this is an error
+      if (!NoCountErr && (OdorR == 0)) {  // it's Air, this is an error
         IsError = true;
 #ifdef DEBUG
-        Serial.print("#Error R");
-        Serial.println(millis());
+        Serial.printf("#Error R %u\r\n",millis());
 #endif
         if (!NoCountErr) break;
       } else {
@@ -477,8 +476,7 @@ bool ExecuteTrial() {  // MatLab RunTrial
 //    Serial.printf("LC %u   RC %u at %u\r\n",LickCountL,LickCountR, (millis() - EndTm));
   }    // end of while CWT
 #ifdef DEBUG
-  Serial.print("#End CWT");
-  Serial.println(millis());
+  Serial.printf("#End CWT %u\r\n",millis());
 #endif
 
   // So what happened this trial? An error or incomplete (ignored)
@@ -613,10 +611,8 @@ void RewVTest(int rate) {
 void GiveReward(byte RewLoc, byte Drops) {  //  RewPin, # of drops
   // Report which reward and which side A B C D
   // Tell for Trial List Results L and R are for licks
-  Rewarding = true;               // Don't let CheckNow do lick processing
   unsigned long RwTm = millis();  // Rew Takes time, so mark time now
                                   // Uses A B C D (ML sends a b c d for manual)
-
   // RewLoc is pin #
   for (byte drp = 0; drp < Drops; drp++) {
     digitalWrite(RewLoc, HIGH);
@@ -629,22 +625,20 @@ void GiveReward(byte RewLoc, byte Drops) {  //  RewPin, # of drops
     delay(DropDelay);
 
   // Tell which reward was given
-  switch (RewLoc) {  // ???? Does this need printf()?
+  switch (RewLoc) {  // ???? Does this need printf() YES?
     case RewLeftA:
-      Serial.print("A");
+      Serial.printf("A%u\r\n",RwTm);
       break;
     case RewLeftB:
-      Serial.print("B");
+      Serial.printf("B%u\r\n",RwTm);
       break;
     case RewRightA:
-      Serial.print("C");
+      Serial.printf("C%u\r\n",RwTm);
       break;
     case RewRightB:
-      Serial.print("D");
+      Serial.printf("D%u\r\n",RwTm);
       break;
   }  // end switch
-  Serial.println(RwTm);
-
 #ifdef DEBUG2
   // Tell the debug window, yeah doing switch twice if DEBUG2
   if (isUpperCase(Cmd)) {  // Manual already told about it
@@ -664,21 +658,17 @@ void GiveReward(byte RewLoc, byte Drops) {  //  RewPin, # of drops
         break;
     }                      // end switch
                            // And the time
-    Serial.println(RwTm);  // was a while ago
+    Serial.println(RwTm);  // was a while ago  == OK in DEBUG2
   }
   // Tell me how long the reward took
-  Serial.print("# RTm ");
-  Serial.println(millis() - RwTm);
+  Serial.printf("# RTm %u\r\n",(millis() - RwTm));
 #endif                // DEBUG2
-  Rewarding = false;  // Done rewarding, proceed with lick checking
 }  // end GiveReward
 
 void ErrorBuzz(int ErrNum) {                   // actually only 1 kind of error in this program
   tone(BUZZER_PIN, Buzz, BuzzTm);              //
   if (ErrNum > 0) {                            // Buzz without E code, for z Buzz test
     Serial.printf("%c%u\r\n", 'E', millis());  //
-                                               //    Serial.print("# Error#");
-                                               //    Serial.println(ErrNum);
   }
 }
 
@@ -732,14 +722,6 @@ void CheckNow() {
   //  handle immediate status updates to MatLab
   // Keep track of both L&R lick counts, check inter lick interval to find a burst of N licks
   // ExecuteTrial during CWT decides what to do about a burst and resets counts as needed.
-
-  /*/ Can't do this!
-  if (Rewarding) {  // Busy giving rewards, so ignore licks for now
-    NewLickLeft = false;
-    NewLickRight = false; 
-  }
-  Instead atomic the letter and time going out
-//*/
   if (NewLickLeft) {                                                   // See if it's legit and put it in the list
                                                                        // Check for lick count for reward, NoCountErr means wrong side is OK
                                                                        // RewEvery rewards every lick
@@ -761,12 +743,12 @@ void CheckNow() {
     WasLastLickLeft = true;  // This one was left side, not right
     // Get set for next lick
     LastLickLeftTm = NewLickLeftTm;  // Saved NewLick so can allow next ISR
-    // pause the other processor
+    // pause the other processor???
     Serial.printf("L%lu\r\n", LastLickLeftTm);  // report the lick to MatLab
                                                 //  when it happened (a while ago!)
     if (RewEvery) {                             // Every lick is a winner!
 #ifdef DEBUG2
-      Serial.print("#Reward Every");
+      Serial.print("#Reward Every L");
       if (RewEvA)
         Serial.println(" with A");
       else  // RewB
@@ -805,7 +787,7 @@ void CheckNow() {
                                                  // Wait reward time before next lick, i.e. ignoring licks during reward of course
                                                  // But what about last lick? Keep going or have a pause
 #ifdef DEBUG2
-      Serial.print("#Reward Every");
+      Serial.print("#Reward Every R");
       if (RewEvA)
         Serial.println(" with A");
       else  // RewB
@@ -878,29 +860,25 @@ void LowerCaseCmd(char Cmd) {  // Handle lower case (immediate) commands
     switch (Cmd) {                             // do as commanded
       case 'a':
 #ifdef DEBUG
-        Serial.print("#Manual Left A ");
-        Serial.println(val, DEC);
+        Serial.printf("#Manual Left A %u\r\n",val);
 #endif
         GiveReward(RewLeftA, val);
         break;
       case 'b':
 #ifdef DEBUG
-        Serial.print("#Manual Left B ");
-        Serial.println(val, DEC);
+        Serial.printf("#Manual Left B %u\r\n",val);
 #endif
         GiveReward(RewLeftB, val);
         break;
       case 'c':
 #ifdef DEBUG
-        Serial.print("#Manual Right A ");
-        Serial.println(val, DEC);
+        Serial.printf("#Manual Right A %u\r\n",val);
 #endif
         GiveReward(RewRightA, val);
         break;
       case 'd':
 #ifdef DEBUG
-        Serial.print("#Manual Right B ");
-        Serial.println(val, DEC);
+        Serial.printf("#Manual Right B %u\r\n",val);
 #endif
         GiveReward(RewRightB, val);
         break;
@@ -1109,8 +1087,7 @@ bool ReadCmds(char Cmd) {                      // Keep reading rest of command s
           else BuzzTm = dfBuzzTm;
           break;
         default:
-          Serial.print("#Bad Command DEC: ");
-          Serial.println(int(Cmd), DEC);
+          Serial.printf("#Bad Command: %c %u\r\n",Cmd,int(Cmd));
           //  return false; keep going? Break out and ignore???
           break;
       }  // end switch
