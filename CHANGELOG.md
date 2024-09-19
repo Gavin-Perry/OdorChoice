@@ -44,3 +44,9 @@
 // 9/14/24
 // Getting occasional 0 times for licks. Suspect crashing messages from Pico
 // converted print("c"); println(val); to printf("c%iu",val); to see if L 0 and R 0 stop happening
+
+9/18/24
+// for ML v16
+//  Remove bool Rewarding, make all prints atomc printf()
+//  Shorten Serial Timeout to 20ms
+//  Fixed Fail (Error) trials to proper # of licks
