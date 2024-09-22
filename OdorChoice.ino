@@ -667,7 +667,8 @@ void GiveReward(byte RewLoc, byte Drops) {  //  RewPin, # of drops
 
 void ErrorBuzz(int ErrNum) {                   // actually only 1 kind of error in this program
   tone(BUZZER_PIN, Buzz, BuzzTm);              //
-  if (ErrNum > 0) {                            // Buzz without E code, for z Buzz test
+  // No reporting of Error number currently
+  if (ErrNum > 0) {                            // Buzz without E code, for z & Buzz test
     Serial.printf("%c%u\r\n", 'E', millis());  //
   }
 }
@@ -882,6 +883,9 @@ void LowerCaseCmd(char Cmd) {  // Handle lower case (immediate) commands
 #endif
         GiveReward(RewRightB, val);
         break;
+      case 'e':  // Error buzz now
+        ErrorBuzz(val);
+        break;  
       case idChar:  // 'i' Just in case out of sync and missed it elsewhere
         if (!isMatLabPresent)
           isMatLabPresent = CheckID;

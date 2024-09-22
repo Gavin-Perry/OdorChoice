@@ -50,3 +50,5 @@
 //  Remove bool Rewarding, make all prints atomc printf()
 //  Shorten Serial Timeout to 20ms
 //  Fixed Fail (Error) trials to proper # of licks
+9/22/24
+// Added e Error Buzz GUI button and command
