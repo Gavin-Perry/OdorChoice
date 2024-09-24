@@ -52,3 +52,5 @@
 //  Fixed Fail (Error) trials to proper # of licks
 9/22/24
 // Added e Error Buzz GUI button and command
+9/24
+// Fixed NoCountErr problem - Does that also fix occasional -1 on error?

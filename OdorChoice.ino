@@ -10,7 +10,6 @@
 //
 // Immediate commands
 //           a b c d  - Give reward now LA LB RA RB
-//           e
 //           n play note (test)
 //           r  (DEBUG only report parameters)
 //           s Resync to microscope
@@ -65,18 +64,18 @@
 // #define DEBUG2 // verbose, mostly for testing handshake to ML
 // Define default values for any params that need them for user convenience
 
-#define dfCWT 2500          // default Choice Wait Time (W)
-#define dfITI 2000          // (I)
-#define dfMinNumLicks 5     // set with param (L)
-#define dfMxLkTm 500        // Maximum time between licks to stay in burst
-#define dfDropTm 25         // msec set by param (U)
-#define dfDropDelay 150     // InterDrop Interval  Minimum value is 50 see ReadCmd 'H'
-#define dfRewEvSpaceTm 20   // Delay before next freebie lick with RewEvery
-#define dfOdorTm 2000       // ms of odor on (T)
-#define dfSyncPol 1         // Low to high (S)
-#define dfToneTm 200        // Set default tone (Note) duration (Y)
-#define dfBuzzTm 1000       // how long for error buzz sound (Z)
-#define dfMaxDrops 7        // default maximum # of drops thus sets total reward time
+#define dfCWT 2500         // default Choice Wait Time (W)
+#define dfITI 2000         // (I)
+#define dfMinNumLicks 5    // set with param (L)
+#define dfMxLkTm 500       // Maximum time between licks to stay in burst
+#define dfDropTm 25        // msec set by param (U)
+#define dfDropDelay 150    // InterDrop Interval  Minimum value is 50 see ReadCmd 'H'
+#define dfRewEvSpaceTm 20  // Delay before next freebie lick with RewEvery
+#define dfOdorTm 2000      // ms of odor on (T)
+#define dfSyncPol 1        // Low to high (S)
+#define dfToneTm 200       // Set default tone (Note) duration (Y)
+#define dfBuzzTm 1000      // how long for error buzz sound (Z)
+#define dfMaxDrops 7       // default maximum # of drops thus sets total reward time
 // Constant values that have to change here
 //     no variable for live changes unless requested??
 #define SynPulseTm 10      // Sync out to microscope duration (fixed but can change)
@@ -431,7 +430,7 @@ bool ExecuteTrial() {  // MatLab RunTrial
   IsError = false;  // A fresh start on errors after tone to start CWT
   Serial.printf("%c%u\r\n", 'W', millis());
 #ifdef DEBUG
-  Serial.printf("#CWT %u\r\n",millis());
+  Serial.printf("#CWT %u\r\n", millis());
 #endif
   // check if licks added to list since odors presented
   // Do any count as errors?
@@ -445,45 +444,60 @@ bool ExecuteTrial() {  // MatLab RunTrial
     // Count Licks during CWT with LickCountL and LickCountR in CheckNow
     // Enough Licks to count as a decision? (MinNumLicks)
     // Check if a reward should be given or an error counted
-    if (LickCountL >= MinNumLicks) {                // enough licks on Left to classify as choice
-      if (!NoCountErr && (OdorL == 0)) {  // it's Air, this is an error
-        IsError = true;
+    if (LickCountL >= MinNumLicks) {  // enough licks on Left to classify as choice
+      if (OdorL == 0)                 // wrong choice it's Air
+      if (NoCountErr) {   // Reset licks and keep going
+          LickCountL = 0;
 #ifdef DEBUG
-        Serial.printf("#Error L %u\r\n",millis());
+          Serial.printf("#NCErr L %u\r\n", millis());
 #endif
-        if (!NoCountErr) break;
-      } else {
-        if (RewLA > 0)                  // Give A if that's the one spec'd
-          GiveReward(RewLeftA, RewLA);  //
-        else GiveReward(RewLeftB, RewLB);
-        break;  // Got reward don't need to wait, only one reward
-      }
-    }                                               // L>M?
-    if (LickCountR >= MinNumLicks) {                // enough licks on Left to classify as choice
-      if (!NoCountErr && (OdorR == 0)) {  // it's Air, this is an error
-        IsError = true;
+          // Keep going for another chance
+		  } else {  // An error that counts
+          IsError = true;
 #ifdef DEBUG
-        Serial.printf("#Error R %u\r\n",millis());
+          Serial.printf("#Error L %u\r\n", millis());
 #endif
-        if (!NoCountErr) break;
-      } else {
-        if (RewRA > 0)                   // Give A if that's the one spec'd
-          GiveReward(RewRightA, RewRA);  //
-        else GiveReward(RewRightB, RewRB);
-        break;  // Got reward don't need to wait, only one reward
+          break;  // Done here it's a Fail
+      } else {  // Good choice
+          if (RewLA > 0)                     // Give A if that's the one spec'd
+            GiveReward(RewLeftA, RewLA);     //
+          else GiveReward(RewLeftB, RewLB);  // OK give B
+          break;                             // Got reward don't need to wait, only one reward
       }
-    }  // R>M?
-//    Serial.printf("LC %u   RC %u at %u\r\n",LickCountL,LickCountR, (millis() - EndTm));
+    }
+    // L>M?
+    if (LickCountR >= MinNumLicks) {      // enough licks on Right to classify as choice
+      if (OdorR == 0)                 // wrong choice it's Air
+      if (NoCountErr) {   // Reset licks and keep going
+          LickCountR = 0;
+#ifdef DEBUG
+          Serial.printf("#NCErr R %u\r\n", millis());
+#endif
+          // Keep going for another chance
+		  } else {  // An error that counts
+          IsError = true;
+#ifdef DEBUG
+          Serial.printf("#Error R %u\r\n", millis());
+#endif
+          break;  // Done here it's a Fail
+      } else {  // Good choice
+          if (RewRA > 0)                     // Give A if that's the one spec'd
+            GiveReward(RewRightA, RewRA);     //
+          else GiveReward(RewRightB, RewRB);  // OK give B
+          break;                       // Got reward don't need to wait, only one reward
+      }
+    }  // R>Min
+       //    Serial.printf("LC %u   RC %u at %u\r\n",LickCountL,LickCountR, (millis() - EndTm));
   }    // end of while CWT
 #ifdef DEBUG
-  Serial.printf("#End CWT %u\r\n",millis());
+  Serial.printf("#End CWT %u\r\n", millis());
 #endif
 
   // So what happened this trial? An error or incomplete (ignored)
   if (!NoCountErr && IsError) {  // Buzz on error unless not counting errors
     ErrorBuzz(1);                // Gives E code
   }                              // error
-  else {                         // Not counted aas error, was it rewarded or ignored?
+  else {                         // Not counted as error, was it rewarded or ignored?
     if ((LickCountL < MinNumLicks) && (LickCountR < MinNumLicks)) {
       // Not rewarded ignored trial (-1)
       Serial.printf("%c%u\r\n", 'X', millis());  // Report trial ignored, and time
@@ -590,7 +604,7 @@ void ValveTest(int rate) {  // click each valve at rate (0.1 sec units)
 
 // Another test just for reward valves
 void RewVTest(int rate) {
-   //*  Do it no reports, not with Give Reward
+  //*  Do it no reports, not with Give Reward
   digitalWrite(RewLeftA, HIGH);
   delay(rate);
   digitalWrite(RewLeftA, LOW);
@@ -627,16 +641,16 @@ void GiveReward(byte RewLoc, byte Drops) {  //  RewPin, # of drops
   // Tell which reward was given
   switch (RewLoc) {  // ???? Does this need printf() YES?
     case RewLeftA:
-      Serial.printf("A%u\r\n",RwTm);
+      Serial.printf("A%u\r\n", RwTm);
       break;
     case RewLeftB:
-      Serial.printf("B%u\r\n",RwTm);
+      Serial.printf("B%u\r\n", RwTm);
       break;
     case RewRightA:
-      Serial.printf("C%u\r\n",RwTm);
+      Serial.printf("C%u\r\n", RwTm);
       break;
     case RewRightB:
-      Serial.printf("D%u\r\n",RwTm);
+      Serial.printf("D%u\r\n", RwTm);
       break;
   }  // end switch
 #ifdef DEBUG2
@@ -661,14 +675,15 @@ void GiveReward(byte RewLoc, byte Drops) {  //  RewPin, # of drops
     Serial.println(RwTm);  // was a while ago  == OK in DEBUG2
   }
   // Tell me how long the reward took
-  Serial.printf("# RTm %u\r\n",(millis() - RwTm));
-#endif                // DEBUG2
+  Serial.printf("# RTm %u\r\n", (millis() - RwTm));
+#endif  // DEBUG2
 }  // end GiveReward
 
-void ErrorBuzz(int ErrNum) {                   // actually only 1 kind of error in this program
-  tone(BUZZER_PIN, Buzz, BuzzTm);              //
+void ErrorBuzz(int ErrNum) {       // actually only 1 kind of error in this program
+  tone(BUZZER_PIN, Buzz, BuzzTm);  //
   // No reporting of Error number currently
-  if (ErrNum > 0) {                            // Buzz without E code, for z & Buzz test
+  // for Buzz test can use 0 to get no report
+  if (ErrNum > 0) {                            // Buzz without E code, for z
     Serial.printf("%c%u\r\n", 'E', millis());  //
   }
 }
@@ -861,31 +876,28 @@ void LowerCaseCmd(char Cmd) {  // Handle lower case (immediate) commands
     switch (Cmd) {                             // do as commanded
       case 'a':
 #ifdef DEBUG
-        Serial.printf("#Manual Left A %u\r\n",val);
+        Serial.printf("#Manual Left A %u\r\n", val);
 #endif
         GiveReward(RewLeftA, val);
         break;
       case 'b':
 #ifdef DEBUG
-        Serial.printf("#Manual Left B %u\r\n",val);
+        Serial.printf("#Manual Left B %u\r\n", val);
 #endif
         GiveReward(RewLeftB, val);
         break;
       case 'c':
 #ifdef DEBUG
-        Serial.printf("#Manual Right A %u\r\n",val);
+        Serial.printf("#Manual Right A %u\r\n", val);
 #endif
         GiveReward(RewRightA, val);
         break;
       case 'd':
 #ifdef DEBUG
-        Serial.printf("#Manual Right B %u\r\n",val);
+        Serial.printf("#Manual Right B %u\r\n", val);
 #endif
         GiveReward(RewRightB, val);
         break;
-      case 'e':  // Error buzz now
-        ErrorBuzz(val);
-        break;  
       case idChar:  // 'i' Just in case out of sync and missed it elsewhere
         if (!isMatLabPresent)
           isMatLabPresent = CheckID;
@@ -934,12 +946,12 @@ void LowerCaseCmd(char Cmd) {  // Handle lower case (immediate) commands
         else
           tone(BUZZER_PIN, val, ToneTm);  // Play specified frequency
         break;
-      case 'v':          // Valve check Open each odor 1 by one then Air and Vac and rewards
-        if (val==1)
+      case 'v':  // Valve check Open each odor 1 by one then Air and Vac and rewards
+        if (val == 1)
           ValveTest(val);  // Allow slow testing for valve debug
-        else {  // even slower for Reward valve test
-          RewVTest(val); // val msec for open time closed is 1/2 that
-        }  
+        else {             // even slower for Reward valve test
+          RewVTest(val);   // val msec for open time closed is 1/2 that
+        }
         break;
       case 'x':  // STOP button pressed, stop the trial, but not during reward I hope
                  // need to check and close valves, Tell MatLab to do it
@@ -962,7 +974,7 @@ void LowerCaseCmd(char Cmd) {  // Handle lower case (immediate) commands
                                //      ValveTest(1);    // Let user run the valve check of just fo it???
         break;                 // end of 'x'  It's long one if we were hung!
       case 'z':                // Do Buzzer
-        ErrorBuzz(val);        // val is Error# 0 - no E
+        ErrorBuzz(0);          // Use Error# 0 - no E reported
         break;
       default:  // got a different lower case letter
 #ifdef DEBUG
@@ -1053,7 +1065,7 @@ bool ReadCmds(char Cmd) {                      // Keep reading rest of command s
           else
             OdorR = val;
           break;
-          //        case 'R':  // was Repeat until correct Handled by MatLab
+          //        case 'R':  // was Repeat until correct, now Handled by MatLab
           //          RepCor = val;
           //          break;
         case 'S':  // Sync polarity 0 = -; 1 = + (Low to High)
@@ -1091,7 +1103,7 @@ bool ReadCmds(char Cmd) {                      // Keep reading rest of command s
           else BuzzTm = dfBuzzTm;
           break;
         default:
-          Serial.printf("#Bad Command: %c %u\r\n",Cmd,int(Cmd));
+          Serial.printf("#Bad Command: %c %u\r\n", Cmd, int(Cmd));
           //  return false; keep going? Break out and ignore???
           break;
       }  // end switch
