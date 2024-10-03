@@ -66,7 +66,7 @@
 
 #define dfCWT 2500         // default Choice Wait Time (W)
 #define dfITI 2000         // (I)
-#define dfMinNumLicks 5    // set with param (L)
+#define dfMinNumLicks 2    // set with param (L) Keep small for debugging
 #define dfMxLkTm 500       // Maximum time between licks to stay in burst
 #define dfDropTm 25        // msec set by param (U)
 #define dfDropDelay 150    // InterDrop Interval  Minimum value is 50 see ReadCmd 'H'
@@ -87,6 +87,8 @@
 // Use sounds in human hearing range too. Notes set to minimize dissonance for user
 #define Buzz 2489  // D7 near resonance of piezo speaker
 #define Note 1865  // A#6  mice hear above 1kHz, Want this higher than buzz or lower OK ??
+
+#define ClickTm  25  // ms for extra click to be sure valves close
 
 //----------------- Pin map using GPIO#s not pin#s ----------------------------
 
@@ -215,7 +217,7 @@ void GiveReward(byte RewLoc, byte Drops);  //  RewPin, # of drops (RewLA RewLB R
 void LickLISR();
 void LickRISR();
 void SyncInISR();
-
+void ErrorBuzz(int ErrNum );
 //
 void setup() {
   unsigned long runTime = millis();  // Use a local version for timing in setup
@@ -267,7 +269,7 @@ void setup() {
       ToggleLED();  // Toggle LED
       if (millis() > (runTime + 20000)) {
         if (!isMatLabPresent)  // This took too long
-          Serial.println("#Help! COM failure");
+          Serial.println("#Help! COM failure");  // But no one is listening!
         runTime = millis();
       }
     }  // while no Matlab present - semi patient.
@@ -385,10 +387,12 @@ bool CheckID() {
         Serial.println("#1");  // Announce to Matlab we are here
       }
     }
+/*/  TOO CONFUSING    
     if (((millis() - timeout) > 10000) && !(inByte == idChar)) {  // This took too long
-      Serial.println("#Help: ML late in CheckID. Press ID button");
+      Serial.println("#Help: ML late");
       return false;
     }
+//*/    
   } while (inByte != ackChar);  // Waiting for the 'd' from ML
 #ifdef DEBUG
   Serial.println("#Pico Connected");  // tell of success
@@ -445,56 +449,58 @@ bool ExecuteTrial() {  // MatLab RunTrial
     // Enough Licks to count as a decision? (MinNumLicks)
     // Check if a reward should be given or an error counted
     if (LickCountL >= MinNumLicks) {  // enough licks on Left to classify as choice
-      if (OdorL == 0)                 // wrong choice it's Air
-      if (NoCountErr) {   // Reset licks and keep going
-          LickCountL = 0;
-#ifdef DEBUG
-          Serial.printf("#NCErr L %u\r\n", millis());
-#endif
-          // Keep going for another chance
-		  } else {  // An error that counts
-          IsError = true;
-#ifdef DEBUG
-          Serial.printf("#Error L %u\r\n", millis());
-#endif
-          break;  // Done here it's a Fail
+      if (OdorL == 0) {                // wrong choice it's Air
+        if (NoCountErr) {   // Reset licks and keep going
+            LickCountL = 0;
+  #ifdef DEBUG
+            Serial.printf("#NCErr L %u\r\n", millis());
+  #endif
+            // Keep going for another chance
+        } else {  // An error that counts as a fail
+            IsError = true;
+  #ifdef DEBUG
+            Serial.printf("#Error L %u\r\n", millis());
+  #endif
+            break;  // Done here it's a Fail
+        } 
       } else {  // Good choice
-          if (RewLA > 0)                     // Give A if that's the one spec'd
-            GiveReward(RewLeftA, RewLA);     //
-          else GiveReward(RewLeftB, RewLB);  // OK give B
-          break;                             // Got reward don't need to wait, only one reward
+            if (RewLA > 0)                     // Give A if that's the one for L
+              GiveReward(RewLeftA, RewLA);     //
+            else GiveReward(RewLeftB, RewLB);  // OK give B
+            break;                             // Got reward don't need to wait, only one reward
       }
     }
+    
     // L>M?
     if (LickCountR >= MinNumLicks) {      // enough licks on Right to classify as choice
-      if (OdorR == 0)                 // wrong choice it's Air
-      if (NoCountErr) {   // Reset licks and keep going
-          LickCountR = 0;
-#ifdef DEBUG
-          Serial.printf("#NCErr R %u\r\n", millis());
-#endif
-          // Keep going for another chance
-		  } else {  // An error that counts
-          IsError = true;
-#ifdef DEBUG
-          Serial.printf("#Error R %u\r\n", millis());
-#endif
-          break;  // Done here it's a Fail
+      if (OdorR == 0) {                // wrong choice it's Air
+        if (NoCountErr) {   // Reset licks and keep going
+            LickCountR = 0;
+  #ifdef DEBUG
+            Serial.printf("#NCErr R %u\r\n", millis());
+  #endif
+            // Keep going for another chance
+        } else {  // An error that counts
+            IsError = true;
+  #ifdef DEBUG
+            Serial.printf("#Error R %u\r\n", millis());
+  #endif
+            break;  // Done here it's a Fail
+        }
       } else {  // Good choice
           if (RewRA > 0)                     // Give A if that's the one spec'd
             GiveReward(RewRightA, RewRA);     //
           else GiveReward(RewRightB, RewRB);  // OK give B
-          break;                       // Got reward don't need to wait, only one reward
-      }
-    }  // R>Min
-       //    Serial.printf("LC %u   RC %u at %u\r\n",LickCountL,LickCountR, (millis() - EndTm));
+        }  break;                       // Got reward don't need to wait, only one reward
+      }  // R>Min
   }    // end of while CWT
 #ifdef DEBUG
   Serial.printf("#End CWT %u\r\n", millis());
 #endif
 
   // So what happened this trial? An error or incomplete (ignored)
-  if (!NoCountErr && IsError) {  // Buzz on error unless not counting errors
+  // If rewarded already given
+  if (IsError) {  // Buzz on error 
     ErrorBuzz(1);                // Gives E code
   }                              // error
   else {                         // Not counted as error, was it rewarded or ignored?
@@ -527,9 +533,18 @@ void OpenAirVac() {
 }
 
 void CloseAirVac() {
+  // 10/1  added extra clicks at end of close to be sure valves close
   digitalWrite(AirL, LOW);
   digitalWrite(AirR, LOW);
-  delay(100);
+  delay(ClickTm);
+  digitalWrite(VAC, LOW);
+  digitalWrite(AirL, HIGH);
+  digitalWrite(AirR, HIGH);
+  delay(ClickTm);
+  digitalWrite(AirL, LOW);
+  digitalWrite(AirR, LOW);
+  digitalWrite(VAC, HIGH);
+  delay(ClickTm);
   digitalWrite(VAC, LOW);
   Serial.printf("%c%u\r\n", 'V', millis());  //
 }
@@ -562,21 +577,47 @@ void OpenOdorValves(byte Lft, byte Rt) {
 }
 
 void CloseOdorValves(byte Lft, byte Rt) {
-  if (Rt == 0)
+  if (Rt == 0) {
     digitalWrite(AirR, LOW);
-  else {
+    delay(ClickTm);
+    digitalWrite(AirR, HIGH);
+    delay(ClickTm);
+    digitalWrite(AirR, LOW);
+   } else {
 #ifdef PCBv1  // work around wiring bug in boards 1.0
-    if (Rt < 8)
+    if (Rt < 8) {
       sr.set(Rt, LOW);  // Shifter calls the bits 0-7 we skipped 0 pin
-    else
+      delay(ClickTm);
+      sr.set(Rt, HIGH);  // Shifter calls the bits 0-7 we skipped 0 pin
+      delay(ClickTm);
+      sr.set(Rt, LOW);  // Shifter calls the bits 0-7 we skipped 0 pin
+    } else {
       sr.set(Rt + 1, LOW);  // Missed QA on the right side of chip2
+      delay(ClickTm);
+      sr.set(Rt + 1, HIGH);  // Shifter calls the bits 0-7 we skipped 0 pin
+      delay(ClickTm);
+      sr.set(Rt + 1, LOW);  // Shifter calls the bits 0-7 we skipped 0 pin
+    }  
 #else
+    
     sr.set(Rt, LOW);   // PCB v2 QA corrected
+    delay(ClickTm);
+    sr.set(Rt, HIGH);  // Shifter calls the bits 0-7 we skipped 0 pin
+    delay(ClickTm);
+    sr.set(Rt, LOW);  // Shifter calls the bits 0-7 we skipped 0 pin
 #endif
   }
-  if (Lft == 0)
-    digitalWrite(AirL, HIGH);
-  else {
+  if (Lft == 0) {
+    digitalWrite(VAC, LOW);
+    delay(ClickTm);
+    digitalWrite(VAC, HIGH);
+    delay(ClickTm);
+    digitalWrite(VAC, LOW);
+  } else {
+    digitalWrite(Lft - 1, LOW);  // GP0 - 9  Version 10
+    delay(ClickTm);
+    digitalWrite(Lft - 1, HIGH);  // GP0 - 9  Version 10
+    delay(ClickTm);
     digitalWrite(Lft - 1, LOW);  // GP0 - 9  Version 10
   }
   Serial.printf("%c%u\r\n", 'F', millis());  // Odors off
@@ -586,40 +627,66 @@ void ValveTest(int rate) {  // click each valve at rate (0.1 sec units)
 #ifdef DEBUG
   Serial.println("#Valve Test");
 #endif
-  rate = rate * 100;  // Convert to msec
+  int ratems = rate * 100;  // Convert to msec
   for (byte i = 1; i < 11; i++) {
     OpenOdorValves(i, i);
-    delay(rate);
+    delay(ratems);
     CloseOdorValves(i, i);
-    delay(rate / 2);
+    delay(ratems / 2);
   }
   tone(BUZZER_PIN, 2000, 500);
   delay(600);
   OpenAirVac();  // All 3 together
-  delay(rate);
+  delay(ratems);
   CloseAirVac();
-  delay(rate / 2);
+  delay(ratems / 2);
   RewVTest(rate);
 }  // end ValveTest
 
 // Another test just for reward valves
-void RewVTest(int rate) {
+// Version 10/1/24 has added a final pulse after the open time 
+// to be sure the valves close
+void RewVTest(int rate) {  // rate is really a period in ms
   //*  Do it no reports, not with Give Reward
-  digitalWrite(RewLeftA, HIGH);
-  delay(rate);
-  digitalWrite(RewLeftA, LOW);
-  delay(rate / 2);
-  digitalWrite(RewLeftB, HIGH);
-  delay(rate);
-  digitalWrite(RewLeftB, LOW);
-  delay(rate / 2);
-  digitalWrite(RewRightA, HIGH);
-  delay(rate);
-  digitalWrite(RewRightA, LOW);
-  delay(rate / 2);
-  digitalWrite(RewRightB, HIGH);
-  delay(rate);
-  digitalWrite(RewRightB, LOW);
+    if (rate>100) {   // do all together so it won't take so long
+      Serial.println("#Cleaning");
+      digitalWrite(RewLeftA, HIGH);
+      digitalWrite(RewLeftB, HIGH);
+      digitalWrite(RewRightA, HIGH);
+      digitalWrite(RewRightB, HIGH);
+      delay(rate);
+      digitalWrite(RewLeftA, LOW);
+      digitalWrite(RewLeftB, LOW);
+      digitalWrite(RewRightA, LOW);
+      digitalWrite(RewRightB, LOW);
+      delay(ClickTm);
+      digitalWrite(RewLeftA, HIGH);
+      digitalWrite(RewLeftB, HIGH);
+      digitalWrite(RewRightA, HIGH);
+      digitalWrite(RewRightB, HIGH);
+      delay(ClickTm);
+      digitalWrite(RewLeftA, LOW);
+      digitalWrite(RewLeftB, LOW);
+      digitalWrite(RewRightA, LOW);
+      digitalWrite(RewRightB, LOW);
+// Plus extra click to be sure they close
+    } else {  // One at a time
+      digitalWrite(RewLeftA, HIGH);
+      delay(rate);
+      digitalWrite(RewLeftA, LOW);
+      delay(rate / 2);
+      digitalWrite(RewLeftB, HIGH);
+      delay(rate);
+      digitalWrite(RewLeftB, LOW);
+      delay(rate / 2);
+      digitalWrite(RewRightA, HIGH);
+      delay(rate);
+      digitalWrite(RewRightA, LOW);
+      delay(rate / 2);
+      digitalWrite(RewRightB, HIGH);
+      delay(rate);
+      digitalWrite(RewRightB, LOW);
+    }
 }
 
 void GiveReward(byte RewLoc, byte Drops) {  //  RewPin, # of drops
@@ -628,17 +695,26 @@ void GiveReward(byte RewLoc, byte Drops) {  //  RewPin, # of drops
   unsigned long RwTm = millis();  // Rew Takes time, so mark time now
                                   // Uses A B C D (ML sends a b c d for manual)
   // RewLoc is pin #
+  // Need to use microseconds for better accuracy than single ms
   for (byte drp = 0; drp < Drops; drp++) {
+#ifdef DEBUG2   // This breaks MatLab
+    Serial.print(" .");  // Dots to count at valve open
+#endif
     digitalWrite(RewLoc, HIGH);
-    delay(DropTm);
+    delayMicroseconds(DropTm*1000);
     digitalWrite(RewLoc, LOW);
-    delay(DropDelay - DropTm);  // Whole loop time is DropDelay
+    delayMicroseconds((DropDelay - DropTm)*1000);  // Whole loop time is DropDelay
   }
-  // Wait out the rest of the reward time
-  for (int i = Drops; i < MaxDrops; i++)
-    delay(DropDelay);
-
-  // Tell which reward was given
+ 
+  if  (DropDelay < 1000) {  // Probably a cleaning if > 1 sec
+    for (int i = Drops; i < MaxDrops; i++) {
+      delay(DropDelay);
+#ifdef DEBUG2   // This breaks MatLab      
+      Serial.print(" x");  // # of waits to Max Drops
+#endif      
+    }
+  }
+   // Tell which reward was given
   switch (RewLoc) {  // ???? Does this need printf() YES?
     case RewLeftA:
       Serial.printf("A%u\r\n", RwTm);
@@ -841,7 +917,7 @@ bool ReadInput() {  // Check for input char from MatLab
                                    //      if (Serial.peek() == idChar) {  // lost comms, MatLab checking for ID?
                                    //        isMatLabPresent = CheckID();  // CheckID want's to read the char itself
                                    //      }
-      // OK, now can "Get" the character out of the buffer
+      // OK, now can Get the character out of the buffer
       Cmd = Serial.read();     // get Command
                                // check if it is a lower case "immediate command"
       if (isLowerCase(Cmd)) {  // Read a lower case command to do now
@@ -1077,7 +1153,7 @@ bool ReadCmds(char Cmd) {                      // Keep reading rest of command s
           else OdorTm = dfOdorTm;
           break;
         case 'U':  // Drop time in ms
-          if (val > 0)
+          if ((val > 0) && (val<(DropDelay-10)) )
             DropTm = val;
           else DropTm = dfDropTm;
           break;

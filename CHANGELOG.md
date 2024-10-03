@@ -54,3 +54,5 @@
 // Added e Error Buzz GUI button and command
 9/24
 // Fixed NoCountErr problem - Does that also fix occasional -1 on error?
+9/27
+// Change delay(DropTm) to delayMicroseonds(DropTm*1000) to improve time accuracy
