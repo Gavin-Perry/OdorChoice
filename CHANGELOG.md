@@ -56,3 +56,6 @@
 // Fixed NoCountErr problem - Does that also fix occasional -1 on error?
 9/27
 // Change delay(DropTm) to delayMicroseonds(DropTm*1000) to improve time accuracy
+10/1 - 10/6
+Rewrite of scoring trials to make clear processiong of Rew, Fail, Ignore
+Fixed extra rewards and ignores
