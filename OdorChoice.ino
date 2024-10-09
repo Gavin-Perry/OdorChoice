@@ -1,5 +1,6 @@
 // Odor Choice Trial  (C) Gavin Perry May 2024 - Oct 2024
 // Version 28 -- aligning Pico code program numbers with ML code
+// V29 same as 28?? aligning with ML
 // Program to take serial input parameters from a Matlab program,
 // Perform the requested trial while collecting data
 // Return real time data to the Matlab program, no Report, let MatLab handle that
@@ -458,7 +459,7 @@ bool ExecuteTrial() {  // MatLab RunTrial
   }  // end of while CWT
 
 #ifdef DEBUG
-  Serial.printf("#End CWT %u\r\n", millis());
+  Serial.printf("#End CWT %u  %u\r\n", millis(), IsDone, !IsDone);
 #endif
   if (!IsDone) {
   // If timed out it's an ignored trial
@@ -480,9 +481,8 @@ bool ExecuteTrial() {  // MatLab RunTrial
 int isAABB() {                   // Check if it's an AA, A0, BB, or B0 trial
   if (OdorL < 6 && OdorR < 6) {  // it's AA or A0
     return 1;
-  } else if ((OdorL > 5) || (OdorL == 0) &&  // BB or B0
-                              (OdorR > 5)
-             || (OdorR == 0)) {
+  } else if (((OdorL > 5) || (OdorL == 0)) &&  // BB or B0
+     ((OdorR > 5) || (OdorR == 0))) {
     return 2;
   } else {
     return 0;  // false, normal AB trial
@@ -513,7 +513,6 @@ void ChkLeft() {
         return;  
       case 1:                           // AA trial, chose L
         if (RewLA > RewRA) {   // L more drops
-//        if (OdorL > OdorR) {             // L stronger
           GiveReward(RewLeftA, RewLA);  //
           IsDone = true;
         } else {                          // oops
@@ -528,8 +527,7 @@ void ChkLeft() {
         }  // error
           return;  
         case 2:                           // BB trial Chose R
-        if (RewLB > RewRB) { // More L drops
-//        if (OdorL > OdorR) {              // L stronger
+        if (RewLB > RewRB) { // More L drops = stronger odor
           GiveReward(RewLeftB, RewLB);  //
           IsDone = true;
         } else {
@@ -572,7 +570,6 @@ void ChkRight() {
       case 1:                            // AA trial, chose R
                                           // Which is it if it matters ????
         if (RewRA > RewLA) { // R more
-//        if (OdorR > OdorL)   {            // R stronger
           GiveReward(RewRightA, RewRA);  //
           IsDone = true;
         } else {
@@ -932,6 +929,7 @@ void CheckNow() {
                                                                        // Check for lick count for reward, NoCountErr means wrong side is OK
                                                                        // RewEvery rewards every lick
                                                                        // and also not insist on fast bursts, this is for training more rewards is better
+// One more question: ??? Does lick on wrong side reset count even if NCE?                                                                       
     if (IsFirstLick || ((WasLastLickLeft &&                            // on the same side
                          ((NewLickLeftTm - LastLickLeftTm) < MxLkTm))  //and in time
                         || NoCountErr))                                // or not counting errors
@@ -1217,7 +1215,7 @@ bool ReadCmds(char Cmd) {                      // Keep reading rest of command s
         case 'G':  // Go time, end of variables to change
           GoTime = true;
           break;
-        case 'H':        // set DropDelay  (probably fixed)
+        case 'H':        // set DropDelay 
           if (val > 50)  // Minimum value
             DropDelay = val;
           else DropDelay = dfDropDelay;
@@ -1231,7 +1229,7 @@ bool ReadCmds(char Cmd) {                      // Keep reading rest of command s
           if (val > 0) MinNumLicks = val;
           else MinNumLicks = dfMinNumLicks;
           break;
-        case 'M':  // Max drops for reward timing
+        case 'M':  // Max drops for constant total reward timing
           if (val > 0) MaxDrops = val;
           else MaxDrops = dfMaxDrops;
           break;

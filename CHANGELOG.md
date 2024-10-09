@@ -59,3 +59,6 @@
 10/1 - 10/6
 Rewrite of scoring trials to make clear processiong of Rew, Fail, Ignore
 Fixed extra rewards and ignores
+10/7 - 10/9
+Fixed all the known bugs so it actually runs correctly
+
