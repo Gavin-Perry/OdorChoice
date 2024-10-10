@@ -1,6 +1,5 @@
 // Odor Choice Trial  (C) Gavin Perry May 2024 - Oct 2024
-// Version 28 -- aligning Pico code program numbers with ML code
-// V29 same as 28?? aligning with ML
+
 // Program to take serial input parameters from a Matlab program,
 // Perform the requested trial while collecting data
 // Return real time data to the Matlab program, no Report, let MatLab handle that
@@ -27,7 +26,11 @@
 // E F L O R S s U V W X x Y Z z  (S start is ITI start)
 // x is stopping a trial
 
-// Moved issue tracking to GitHub (ssh) git@github.com:Gavin-Perry/OdorChoice.git
+// Moved older issue tracking to GitHub (ssh) git@github.com:Gavin-Perry/OdorChoice.git
+// Version 28 -- aligning Pico code program numbers with ML code
+// V29 aligning with ML
+// Temporary difference between left and right for when to allow more licks
+// V30 faster RewEvery lick rate, clean up burst counting
 
 //=================================
 // TO DO
@@ -142,6 +145,7 @@ ShiftRegister74HC595<2> sr(dataPin, clockPin, latchPin);  // create a shift regi
 int OdorTm = dfOdorTm;  // Set to defaults defined above 'T'
 int DropTm = dfDropTm;
 int DropDelay = dfDropDelay;
+int MinDD = 50;  // fastest possible time to next reward (ms) in RewEvery case
 int ITI = dfITI;  // Wait time before trial
 
 unsigned long  // milli() Times
@@ -172,7 +176,7 @@ bool RewEvery = false;         // Reward Every Lick
 bool RewEvA = false;           // for EewEvery true: the juice A, false B
 bool NewLickLeft = false;      // Unreported lick on the left?
 bool NewLickRight = false;     // Unreported lick on the right?
-bool IsFirstLick = true;       // Ignore was last lick on first of burst
+bool IsFirstLick = true;       // No licks yet, first of burst
 bool WasLastLickLeft = false;  // true if the last lick was on the left
 bool SyncPol = dfSyncPol;      // Sync polarity
 bool Stress = false;           // running stress test
@@ -815,7 +819,8 @@ void GiveReward(byte RewLoc, int Drops) {  //  RewPin, # of drops
     digitalWrite(RewLoc, LOW);
     delayMicroseconds((DropDelay - DropTm) * 1000);  // Whole loop time is DropDelay
   }
-  if (DropDelay < 1000) {  // Probably a cleaning if > 1 sec so no wait
+  if ((DropDelay < 1000) && (RewEvery == 0)) {  
+  // Probably a cleaning if > 1 sec so no wait also no waiting for reward every
     for (int i = Drops; i < MaxDrops; i++) {
       delay(DropDelay);
 #ifdef DEBUG2              // This breaks MatLab
@@ -823,6 +828,10 @@ void GiveReward(byte RewLoc, int Drops) {  //  RewPin, # of drops
 #endif
     }
   }
+    // v2.8 Reset lick counts to avoid rewarding extra rewards for licking rewards
+  LickCountL = 0; // Reset licks 
+  LickCountR = 0; // Reset licks 
+
   // Tell which reward was given
   switch (RewLoc) {  //
     case RewLeftA:
@@ -838,9 +847,7 @@ void GiveReward(byte RewLoc, int Drops) {  //  RewPin, # of drops
       Serial.printf("D%u\r\n", RwTm);
       break;
   }  // end switch
-  // v2.8 Reset lick counts (from reward licks) to avoid double rewards
-  LickCountL = 0; // Reset licks 
-  LickCountR = 0; // Reset licks 
+
 }  // end Give Reward
 
 void ErrorBuzz(int ErrNum) {       // actually only 1 kind of error in this program
@@ -929,25 +936,22 @@ void CheckNow() {
                                                                        // Check for lick count for reward, NoCountErr means wrong side is OK
                                                                        // RewEvery rewards every lick
                                                                        // and also not insist on fast bursts, this is for training more rewards is better
-// One more question: ??? Does lick on wrong side reset count even if NCE?                                                                       
-    if (IsFirstLick || ((WasLastLickLeft &&                            // on the same side
-                         ((NewLickLeftTm - LastLickLeftTm) < MxLkTm))  //and in time
-                        || NoCountErr))                                // or not counting errors
+// One more question: ??? Does lick on wrong side reset count even if NCE = YES                                                                       
+    if (IsFirstLick || (WasLastLickLeft &&                            // on the same side
+                         ((NewLickLeftTm - LastLickLeftTm) < MxLkTm)))  //and in time
     {                                                                  // still in the burst OR not counting errors, add 1
       LickCountL++;
-      IsFirstLick = false;
-    } else {  // Nope it's wrong side or too long and errors count
-      if ((LickCountL < MinNumLicks) && (MinNumLicks > 1)) {
-        LickCountL = 1;  // start over but this one counts as first
-        IsFirstLick = false;
-      }
-      LickCountR = 0;  // start over right licks
+    } else {  // Nope it's wrong side or too long since last lick
+      LickCountL = 1;  // start over but this one counts as first
     }
-
+    IsFirstLick = false; // a lick that counted so not first next time
     WasLastLickLeft = true;  // This one was left side, not right
-    // Get set for next lick
+    LickCountR = 0;  // start over right licks
+// Get set for next lick timing for in burst or not
     LastLickLeftTm = NewLickLeftTm;  // Saved NewLick so can allow next ISR
     // pause the other processor???
+    NewLickLeft = false;  // clear it, allow ISR now Here or after reward?
+
     Serial.printf("L%lu\r\n", LastLickLeftTm);  // report the lick to MatLab
                                                 //  when it happened (a while ago!)
     if (RewEvery) {                             // Every lick is a winner!
@@ -957,29 +961,24 @@ void CheckNow() {
         GiveReward(RewLeftB, RewLB);
       delay(RewEvSpaceTm);  // Minimum time to next freebie reward
     }
-    NewLickLeft = false;  // clear it, allow ISR now
   }                       //End NLLeft processing
 
   if (NewLickRight) {
     // v7 See if it's legit and put it in the list
-
     // Check for lick count for reward NoCountErr means wrong side is OK
     // and also not insist on fast bursts, this is for training more rewards is better
-    if (IsFirstLick || ((!WasLastLickLeft &&                             // on the same side
-                         ((NewLickRightTm - LastLickRightTm) < MxLkTm))  //and in time
-                        || NoCountErr))                                  // or not counting errors
+    if (IsFirstLick || (!WasLastLickLeft &&                             // on the same side
+                         ((NewLickRightTm - LastLickRightTm) < MxLkTm)))  //and in time
     {                                                                    // still in the burst or not counting errors
       LickCountR++;
-      IsFirstLick = false;
     } else {  // Nope it's wrong side or too long and errors count
-      if ((LickCountR < MinNumLicks) && (MinNumLicks > 1)) {
-        LickCountL = 0;  // start over both
-        LickCountR = 1;  // start over but this one counts
-        IsFirstLick = false;
+        LickCountR = 1;  // start over but this one counts as first
       }
-    }
+    IsFirstLick = false; // No longer first in burst
+    LickCountL = 0;  // start over for Left
     WasLastLickLeft = false;                     // This one was right side
     LastLickRightTm = NewLickRightTm;            // Saved NewLick so can allow next ISR
+    NewLickRight = false;  // clear it, allow ISR now
     Serial.printf("R%lu\r\n", LastLickRightTm);  // report the lick to MatLab
     if (RewEvery) {                              // Every lick is a winner! But don't overlap them,
                                                  // Wait reward time before next lick, i.e. ignoring licks during reward of course
@@ -991,7 +990,6 @@ void CheckNow() {
       // end reward every. Take a break? MinRewSpacing between reward every's
       delay(RewEvSpaceTm);  // Minimum time to next freebie reward
     }
-    NewLickRight = false;  // clear it, allow ISR now
   }                        // end NLRight processing
 
 
@@ -1216,7 +1214,7 @@ bool ReadCmds(char Cmd) {                      // Keep reading rest of command s
           GoTime = true;
           break;
         case 'H':        // set DropDelay 
-          if (val > 50)  // Minimum value
+          if (val > MinDD)  // Minimum value
             DropDelay = val;
           else DropDelay = dfDropDelay;
           break;
