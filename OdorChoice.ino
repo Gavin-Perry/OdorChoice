@@ -31,6 +31,8 @@
 // V29 aligning with ML
 // Temporary difference between left and right for when to allow more licks
 // V30 faster RewEvery lick rate, clean up burst counting
+// Stable version 
+// V31 start 10/12
 
 //=================================
 // TO DO
@@ -414,14 +416,13 @@ bool ExecuteTrial() {  // MatLab RunTrial
   Serial.println("#GO");
 #endif
   StartTm = millis();  // Start of this trial. Does anyone care later?
-  Serial.printf("%c%u\r\n", 'S', StartTm);
+  Serial.printf("%c%u\r\n",'S', StartTm);
+  delay(5);  // 5ms to separate S from U
   OpenAirVac();              // Clear last odors
   if ((ITI - PostSync) > 0)  // if ITI < 2 sec, skip it
     delay(ITI - PostSync);   // wait out the ITI time (minus 2 sec)
   DoSyncPulse();
-#ifdef DEBUG
-  Serial.printf("%c%u\r\n", 'Y', millis());  // tell Sync
-#endif
+  Serial.printf("Y%u\r\n", millis());  // tell Sync
   delay(PostSync);  // wait for microscope to start
   CloseAirVac();
   // Open odor valves
@@ -451,14 +452,17 @@ bool ExecuteTrial() {  // MatLab RunTrial
     // Count Licks during CWT with LickCountL and LickCountR updates from CheckNow()
     // Enough Licks to count as a decision? (MinNumLicks)
     // Check if a reward should be given or an error counted
-//======================== Left Lick ====================================
-    if (LickCountL >= MinNumLicks)   // enough licks on Left to classify as choice
+//======================== Left Lick burst? ====================================
+    if (LickCountL >= MinNumLicks)  { // enough licks on Left to classify as choice
       ChkLeft();
-    if (IsDone) break;
-
+      // after a good burst always reset the lick counts  
+      LickCountL = 0; // Reset licks 
+    }
     // ========================== Now check right side ==========================
-    if (LickCountR >= MinNumLicks)   // enough licks on Right to classify as choice
+    if (LickCountR >= MinNumLicks) {   // enough licks on Right to classify as choice
       ChkRight();
+      LickCountR = 0; // Reset licks 
+    }
     if (IsDone) break;
   }  // end of while CWT
 
@@ -494,9 +498,6 @@ int isAABB() {                   // Check if it's an AA, A0, BB, or B0 trial
 }
 
 void ChkLeft() {
-// after a good burst always reset the lick counts  
-  LickCountL = 0; // Reset licks 
-  LickCountR = 0; // Reset licks 
   if (OdorL == 0) {      // wrong choice Air on Left
     if (NoCountErr) {    // Keep going for another chance         
 #ifdef DEBUG
@@ -550,9 +551,6 @@ void ChkLeft() {
 
 
 void ChkRight() {
-  // after a good burst always reset the lick counts  
-  LickCountL = 0; // Reset licks 
-  LickCountR = 0; // Reset licks 
   if (OdorR == 0) {               // wrong choice it's Air
     if (NoCountErr) {            // and keep going
 #ifdef DEBUG
@@ -566,7 +564,7 @@ void ChkRight() {
   } else {   // Not Air trial
     switch (isAABB()) {                     // What trial type
       case 0:                               //  Normal AB
-        if (RewRA > 0)                      // Give A if that's the
+        if (RewRA > 0)                      // Give A if that's the one
           GiveReward(RewRightA, RewRA);     //
         else GiveReward(RewRightB, RewRB);  // OK give B
         IsDone = true;
@@ -880,6 +878,7 @@ void ErrorBuzz(int ErrNum) {       // actually only 1 kind of error in this prog
     Serial.println(millis());
 #endif
   }
+  delay(BuzzTm); // wait for buzz to finish
 }
 
 // ISRs // Falling voltage on pin check if minimum interval has passed to count another lick
@@ -995,7 +994,7 @@ void CheckNow() {
 
   // Look at immediate commands like reward now (any LowerCase),
   //  else pass on to ReadCmds for parameter changes (for next trial)
-  ReadInput();  // Do we care here is a valid trial command given (true)???
+  ReadInput();  // Do we care here if a valid trial command given? 
                 // Probably not, I think everything was handled
                 // Either something was taken care of now or a trial was triggered
 
@@ -1095,7 +1094,7 @@ void LowerCaseCmd(char Cmd) {  // Handle lower case (immediate) commands
           ITI, OdorTm, CWT, OdorL, OdorR, RewLA, RewLB, RewRA, RewRB);
         if (val >= 2) {  // Tell me more
           Serial.printf(
-            " (M)xDrp %u, DropTm(U) %u, M(X)Lk %u, Rw(E)v %u, (N)oCErr %u, TnTm(Y) %u, B(Z)Tm %u\r\n",
+            "#(M)xDrp %u, DropTm(U) %u, M(X)Lk %u, Rw(E)v %u, (N)oCErr %u, TnTm(Y) %u, B(Z)Tm %u\r\n",
             MaxDrops, DropTm, MxLkTm, (RewEvery + RewEvA), NoCountErr, ToneTm, BuzzTm);
         }
         if (val >= 3) {  // Even more debugging details
@@ -1149,7 +1148,7 @@ void LowerCaseCmd(char Cmd) {  // Handle lower case (immediate) commands
           Serial.printf("x%u\r\n", millis());
           Serial.printf("z%u\r\n", millis());  //  Tell Matlab done (if needed)
         }                                      // if trial finished already got the 'z'
-                                               // fall into... Buzz
+        break;                                               
       case 'z':                                // Do Buzzer
         ErrorBuzz(0);                          // Use Error# 0 - no E reported
         break;

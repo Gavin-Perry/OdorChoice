@@ -63,3 +63,5 @@ Fixed extra rewards and ignores
 Fixed all the known bugs so it actually runs correctly
 10/10
 Speed up reward every and simplify burst counting
+10/14
+v3.1  added break for 'x' so stopping doesn't cause an error buzz
