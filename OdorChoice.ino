@@ -33,6 +33,7 @@
 // V30 faster RewEvery lick rate, clean up burst counting
 // Stable version 
 // V31 start 10/12
+// V33 fixed GivReward for faster drops when manual as well as lick every
 
 //=================================
 // TO DO
