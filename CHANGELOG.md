@@ -65,4 +65,5 @@ Fixed all the known bugs so it actually runs correctly
 Speed up reward every and simplify burst counting
 10/14
 v3.1  added break for 'x' so stopping doesn't cause an error buzz
-10/15  V33 fixed GiveReward for faster drops when manual as well as lick every
+10/15  V33 & v34 fixed GiveReward for faster drops when manual as well as lick every
+10/16 v35 fixed Pico rewarding both sides on AB trials (since AA and BB were started at V20)!
