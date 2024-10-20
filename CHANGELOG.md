@@ -56,15 +56,7 @@
 // Fixed NoCountErr problem - Does that also fix occasional -1 on error?
 9/27
 // Change delay(DropTm) to delayMicroseonds(DropTm*1000) to improve time accuracy
-10/1 - 10/6
-Rewrite of scoring trials to make clear processiong of Rew, Fail, Ignore
-Fixed extra rewards and ignores
-10/7 - 10/9
-Fixed all the known bugs so it actually runs correctly
-10/10
-Speed up reward every and simplify burst counting
-10/14
-v3.1  added break for 'x' so stopping doesn't cause an error buzz
-10/15  V33 & v34 fixed GiveReward for faster drops when manual as well as lick every
-10/16 v35 fixed Pico rewarding both sides on AB trials (since AA and BB were started at V20)!
-10/20 is WRONG AB allow choice on either side.
+10/14  V33 fixed GiveReward for faster drops when manual as well as lick every
+10/20 v34 removed extra return; repace with break; as needed
+Ignore v35 it's a mistake to treat AB as error on either side
+10/20  v36 to sync with new ML v36

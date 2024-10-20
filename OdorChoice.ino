@@ -507,7 +507,6 @@ void ChkLeft() {
     } else {  // An error, that counts as a fail
       IsDone = true;
       ErrorBuzz(1);  // Error Left on Air
- 
     }
   } else {  // Not 0 odor; Good choice? check for larger on AA and BB offers
     switch (isAABB()) {                    // What trial type
@@ -516,7 +515,7 @@ void ChkLeft() {
           GiveReward(RewLeftA, RewLA);     //
         else GiveReward(RewLeftB, RewLB);  // OK give B
         IsDone = true;
-      
+        break;
       case 1:                           // AA trial, chose L
         if (RewLA > RewRA) {   // L more drops
           GiveReward(RewLeftA, RewLA);  //
@@ -549,7 +548,6 @@ void ChkLeft() {
     }  // End switch
   } //  end Odor !0
 }  // Chk Left
-
 
 void ChkRight() {
   if (OdorR == 0) {               // wrong choice it's Air
