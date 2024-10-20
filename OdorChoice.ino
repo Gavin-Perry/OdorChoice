@@ -507,27 +507,16 @@ void ChkLeft() {
     } else {  // An error, that counts as a fail
       IsDone = true;
       ErrorBuzz(1);  // Error Left on Air
+ 
     }
-  } else {  // Not 0 odor; Good choice? check for larger on all offers
+  } else {  // Not 0 odor; Good choice? check for larger on AA and BB offers
     switch (isAABB()) {                    // What trial type
       case 0:                              //  Normal AB choice is OK
-        if ((RewLA+RewLB) > (RewRA+RewRB)) { // Left is correct
-          if (RewLA > 0)                     // Give A if that's the one
-            GiveReward(RewLeftA, RewLA);     //
-          else GiveReward(RewLeftB, RewLB);  // OK give B
-          IsDone = true;
-        } else {  // Wrong answer
-          if (NoCountErr) {           
-#ifdef DEBUG
-            Serial.printf("#NCErr LAB< %u\r\n", millis());
-#endif              
-          } else {
-              IsDone = true;
-              ErrorBuzz(2);  // Fail
-          }        
-        }
-        break;
-
+        if (RewLA > 0)                     // Give A if that's the one
+          GiveReward(RewLeftA, RewLA);     //
+        else GiveReward(RewLeftB, RewLB);  // OK give B
+        IsDone = true;
+      
       case 1:                           // AA trial, chose L
         if (RewLA > RewRA) {   // L more drops
           GiveReward(RewLeftA, RewLA);  //
@@ -539,11 +528,10 @@ void ChkLeft() {
 #endif              
           } else {
               IsDone = true;
-              ErrorBuzz(3);  // Fail
+              ErrorBuzz(2);  // Fail
           }
         }  // error
           break;  
-
         case 2:                           // BB trial Chose R
         if (RewLB > RewRB) { // More L drops = stronger odor
           GiveReward(RewLeftB, RewLB);  //
@@ -555,11 +543,11 @@ void ChkLeft() {
 #endif              
           } else {          
             IsDone = true;
-            ErrorBuzz(4);  //  BB smaller picked
+            ErrorBuzz(3);  //  BB smaller picked
           }
         }  // error
-    }  // End switch 
-  } // end Odor !0
+    }  // End switch
+  } //  end Odor !0
 }  // Chk Left
 
 
@@ -571,26 +559,15 @@ void ChkRight() {
 #endif
     } else {  // An error that counts
         IsDone = true;
-        ErrorBuzz(5);  // Error Right on Air
+        ErrorBuzz(4);  // Error Right on Air
     }
   } else {   // Not Air trial
     switch (isAABB()) {                     // What trial type
       case 0:                               //  Normal AB
-        if ((RewLA+RewLB) < (RewRA+RewRB)) { // Right is correct
-          if (RewRA > 0)                     // Give A if that's the one
-            GiveReward(RewRightA, RewRA);     //
-          else GiveReward(RewRightB, RewRB);  // OK give B
-          IsDone = true;
-        } else {  // Wrong answer
-          if (NoCountErr) {           
-#ifdef DEBUG
-            Serial.printf("#NCErr RAB< %u\r\n", millis());
-#endif              
-          } else {
-              IsDone = true;
-              ErrorBuzz(6);  // Fail AB
-          }        
-        }
+        if (RewRA > 0)                      // Give A if that's the one
+          GiveReward(RewRightA, RewRA);     //
+        else GiveReward(RewRightB, RewRB);  // OK give B
+        IsDone = true;
         break;
       case 1:                            // AA trial, chose R
                                           // Which is it if it matters ????
@@ -604,7 +581,7 @@ void ChkRight() {
 #endif              
           } else {          
           IsDone = true;
-          ErrorBuzz(7);  // AA
+          ErrorBuzz(5);  //
           }
         }                // error
         break;  // from switch
@@ -619,7 +596,7 @@ void ChkRight() {
 #endif 
           } else {
             IsDone = true;
-            ErrorBuzz(8);  // BB
+            ErrorBuzz(6);  // 
           }
         }                // error
     }  // End switch
