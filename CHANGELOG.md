@@ -62,3 +62,4 @@ Ignore v35 it's a mistake to treat AB as error on either side
 10/20  v36 to sync with new ML v36
 10/23 added individual odor valve opening for testing 
 Use v1 to v20 for L1-10, R11-20, 21=Air/Vac v0 is close all
+Added 21 AirL 22 AirR 23 Air/Vac

@@ -1160,14 +1160,19 @@ void LowerCaseCmd(char Cmd) {  // Handle lower case (immediate) commands
         else
           tone(BUZZER_PIN, val, ToneTm);  // Play specified frequency
         break;
-      case 'v':        // Valve check Open each odor one by one then Air and Vac and rewards
+ //  V3.7 individual valve opening or closing for testing
+      case 'v':        
         if (val>40)
             RewVTest(val);          // Allow slow () or fast (1000) testing of Rewards only
-        else if (val>21)            // Test all valves as before
+        else if (val>23)            // Test all valves as before
             ValveTest(val);         // Valve check Open each odor one by one then Air and Vac and rewards
-        else if (val==21)    
+        else if (val==23)           // Vac test
           OpenAirVac();
-        else if (val > 10)          // V3.7 individual valve opening or closing
+        else if (val==22)    
+          OpenOdorValves(-1,0);    // Air right
+        else if (val==21)    
+          OpenOdorValves(0,-1);      // Air Left
+        else if (val > 10)          // V3.7 individual odor valve opening or closing
             OpenOdorValves(-1,val-10); // it's right
         else if (val>0)
             OpenOdorValves(val,-1);               // it's left
