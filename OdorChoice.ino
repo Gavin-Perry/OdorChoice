@@ -14,6 +14,7 @@
 //           n play note (test)
 //           r  (DEBUG only report parameters)
 //           s Resync to microscope
+//           v Open Valve
 //           x STOP!  Pause at end of trial
 //           z  Buzzer
 // Parameter Codes from Matlab used (details in ReadInputs)
@@ -213,8 +214,9 @@ void LowerCaseCmd(char Cmd);  // Called in ReadInput and on error in ReadCmds wi
 bool ExecuteTrial();          // True if successful false on timeout or other failure
 void OpenAirVac();
 void CloseAirVac();
-void OpenOdorValves(byte Lft, byte Rt);
-void CloseOdorValves(byte Lft, byte Rt);
+void OpenOdorValves(signed char Lft, signed char Rt);
+void CloseOdorValves(char Lft, char Rt);
+void CloseAllValves(); 
 void DoSyncPulse();
 void ChkLeft();     // if burst of left licks process response
 void ChkRight();    // if burst of right licks process response
@@ -632,35 +634,40 @@ void CloseAirVac() {
   Serial.printf("%c%u\r\n", 'V', millis());  //
 }
 
-void OpenOdorValves(byte Lft, byte Rt) {
-  if (Rt == 0)
-    digitalWrite(AirR, HIGH);
-  else {
-    // Open Right mapped to '595
+void OpenOdorValves(signed char Lft, signed char Rt) {
+  if (Rt >= 0) {  // skip right if -, it's a manual test
+    if (Rt == 0)
+      digitalWrite(AirR, HIGH);
+    else {
+      // Open Right mapped to '595
 
-    // work around wiring bug in board PCB v1.0
+      // work around wiring bug in board PCB v1.0
 #ifdef PCBv1
-    if (Rt < 8)
-      sr.set(Rt, HIGH);  // Shifter calls the bits 0-7 we skipped 0 pin
-    else
-      sr.set(Rt + 1, HIGH);  // Missed QA on the right side of chip2
+      if (Rt < 8)
+        sr.set(Rt, HIGH);  // Shifter calls the bits 0-7 we skipped 0 pin
+      else
+        sr.set(Rt + 1, HIGH);  // Missed QA on the right side of chip2
 #else                        // PCB V2
-    sr.set(Rt, HIGH);  // PCB v2 QA corrected
+      sr.set(Rt, HIGH);  // PCB v2 QA corrected
 #endif
+    }
   }
-  if (Lft == 0)
-    digitalWrite(AirL, HIGH);
-  else {
-    // Open left valve map 1-10 to GP0-GP9 Version 10
-    digitalWrite(Lft - 1, HIGH);
+  if (Lft >= 0) {  // skip left if -, it's a manual test
+    if (Lft == 0)
+      digitalWrite(AirL, HIGH);
+    else {
+      // Open left valve map 1-10 to GP0-GP9 Version 10
+      digitalWrite(Lft - 1, HIGH);
+    }
   }
 #ifdef DEBUG
-  Serial.printf("%c%u\r\n", 'O', millis());  //
+  if ((Lft>0) && (Rt>0))
+    Serial.printf("%c%u\r\n", 'O', millis());  //
 #endif
 }
 
-void CloseOdorValves(byte Lft, byte Rt) {
-  if (Rt == 0) {
+void CloseOdorValves(char Lft, char Rt) {
+  if (Rt==0) {   // 
     digitalWrite(AirR, LOW);
     delay(ClickTm);
     digitalWrite(AirR, HIGH);
@@ -682,7 +689,6 @@ void CloseOdorValves(byte Lft, byte Rt) {
       sr.set(Rt + 1, LOW);  // Shifter calls the bits 0-7 we skipped 0 pin
     }
 #else
-
     sr.set(Rt, LOW);  // PCB v2 QA corrected
     delay(ClickTm);
     sr.set(Rt, HIGH);  // Shifter calls the bits 0-7 we skipped 0 pin
@@ -706,12 +712,47 @@ void CloseOdorValves(byte Lft, byte Rt) {
   Serial.printf("%c%u\r\n", 'F', millis());  // Odors off
 }  // End Close Odor Valves
 
+void CloseAllValves() {
+  for (char Rt=1; Rt<11; Rt++)
+#ifdef PCBv1  // work around wiring bug in boards 1.0
+    if (Rt < 8) {
+      sr.set(Rt, LOW);  // Shifter calls the bits 0-7 we skipped 0 pin
+      delay(ClickTm);
+      sr.set(Rt, HIGH);  // Shifter calls the bits 0-7 we skipped 0 pin
+      delay(ClickTm);
+      sr.set(Rt, LOW);  // Shifter calls the bits 0-7 we skipped 0 pin
+    } else {
+      sr.set(Rt + 1, LOW);  // Missed QA on the right side of chip2
+      delay(ClickTm);
+      sr.set(Rt + 1, HIGH);  // Shifter calls the bits 0-7 we skipped 0 pin
+      delay(ClickTm);
+      sr.set(Rt + 1, LOW);  // Shifter calls the bits 0-7 we skipped 0 pin
+    }
+#else
+  {
+    sr.set(Rt, LOW);  // PCB v2 QA corrected
+    delay(ClickTm);
+    sr.set(Rt, HIGH);  // Shifter calls the bits 0-7 we skipped 0 pin
+    delay(ClickTm);
+    sr.set(Rt, LOW);  // Shifter calls the bits 0-7 we skipped 0 pin
+  }  
+#endif
+  for (int Lft=1; Lft<11; Lft++) {
+    digitalWrite(Lft - 1, LOW);  // GP0 - 9  Version 10
+    delay(ClickTm);
+    digitalWrite(Lft - 1, HIGH);  // GP0 - 9  Version 10
+    delay(ClickTm);
+    digitalWrite(Lft - 1, LOW);  // GP0 - 9  Version 10
+  }
+  CloseAirVac();
+} 
+
 void ValveTest(int rate) {  // click each valve at rate (0.1 sec units)
 #ifdef DEBUG
   Serial.println("#Valve Test");
 #endif
   int ratems = rate * 100;         // Convert to msec
-  for (byte i = 1; i < 11; i++) {  // each of 10 valves 1 - 10
+  for (char i = 1; i < 11; i++) {  // each of 10 valves 1 - 10
     OpenOdorValves(i, i);
     delay(ratems);
     CloseOdorValves(i, i);
@@ -726,7 +767,7 @@ void ValveTest(int rate) {  // click each valve at rate (0.1 sec units)
   RewVTest(rate);
 }  // end Valve Test
 
-// TTest just for reward valves 10/4 added stress test
+// Test just for reward valves 10/4 added stress test
 // Version 10/1/24 has added a final pulse after the open time
 // to be sure the valves close
 void RewVTest(int rate) {  // rate is really a period in ms
@@ -756,7 +797,7 @@ void RewVTest(int rate) {  // rate is really a period in ms
       Serial.printf("#Total: %u,000\r\n", count);
       delay(500);
     }                      // while Stress
-  } else if (rate > 30) {  // do all together so it won't take so long
+  } else if (rate > 50) {  // do all together so it won't take so long
     Serial.println("#Cleaning");
     digitalWrite(RewLeftA, HIGH);
     digitalWrite(RewLeftB, HIGH);
@@ -915,7 +956,7 @@ void SyncInISR() {  // Sync from microscope, time stamp it
 }
 
 void SetALLlow() {                  //Set all output pins low (when forcing stop)
-  for (byte i = 0; i <= 22; i++) {  // set all output pins on and LOW
+  for (char i = 0; i <= 22; i++) {  // set all output pins on and LOW
     digitalWrite(i, LOW);
   }
   sr.setAllLow();  // set all ShiftReg pins LOW
@@ -1119,13 +1160,21 @@ void LowerCaseCmd(char Cmd) {  // Handle lower case (immediate) commands
         else
           tone(BUZZER_PIN, val, ToneTm);  // Play specified frequency
         break;
-      case 'v':        // Valve check Open each odor 1 by one then Air and Vac and rewards
-        if (val == 1)  // Test all valves
-          ValveTest(val);
-        else {  // Allow slow or fast testing of Rewards only
-          RewVTest(val);
-        }
-        break;
+      case 'v':        // Valve check Open each odor one by one then Air and Vac and rewards
+        if (val>40)
+            RewVTest(val);          // Allow slow () or fast (1000) testing of Rewards only
+        else if (val>21)            // Test all valves as before
+            ValveTest(val);         // Valve check Open each odor one by one then Air and Vac and rewards
+        else if (val==21)    
+          OpenAirVac();
+        else if (val > 10)          // V3.7 individual valve opening or closing
+            OpenOdorValves(-1,val-10); // it's right
+        else if (val>0)
+            OpenOdorValves(val,-1);               // it's left
+        else   // 0 (or less)
+            CloseAllValves();  
+        break; // end 'v' 
+
       case 'x':  // STOP button pressed, stop the trial, but not during reward I hope
                  // need to check and close valves, Tell MatLab to do it
                  // Emergency stop with reboot is problematic as USB connection can be lost due to Windoze way of retermining if the connection is there.
