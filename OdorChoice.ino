@@ -667,48 +667,52 @@ void OpenOdorValves(signed char Lft, signed char Rt) {
 }
 
 void CloseOdorValves(char Lft, char Rt) {
-  if (Rt==0) {   // 
-    digitalWrite(AirR, LOW);
-    delay(ClickTm);
-    digitalWrite(AirR, HIGH);
-    delay(ClickTm);
-    digitalWrite(AirR, LOW);
-  } else {
+  if (Rt >= 0) {  // skip right if -, it's a manual test
+    if (Rt==0) {   // 
+      digitalWrite(AirR, LOW);
+      delay(ClickTm);
+      digitalWrite(AirR, HIGH);
+      delay(ClickTm);
+      digitalWrite(AirR, LOW);
+    } else {
 #ifdef PCBv1  // work around wiring bug in boards 1.0
-    if (Rt < 8) {
-      sr.set(Rt, LOW);  // Shifter calls the bits 0-7 we skipped 0 pin
+      if (Rt < 8) {
+        sr.set(Rt, LOW);  // Shifter calls the bits 0-7 we skipped 0 pin
+        delay(ClickTm);
+        sr.set(Rt, HIGH);  // Shifter calls the bits 0-7 we skipped 0 pin
+        delay(ClickTm);
+        sr.set(Rt, LOW);  // Shifter calls the bits 0-7 we skipped 0 pin
+      } else {
+        sr.set(Rt + 1, LOW);  // Missed QA on the right side of chip2
+        delay(ClickTm);
+        sr.set(Rt + 1, HIGH);  // Shifter calls the bits 0-7 we skipped 0 pin
+        delay(ClickTm);
+        sr.set(Rt + 1, LOW);  // Shifter calls the bits 0-7 we skipped 0 pin
+      }
+#else
+      sr.set(Rt, LOW);  // PCB v2 QA corrected
       delay(ClickTm);
       sr.set(Rt, HIGH);  // Shifter calls the bits 0-7 we skipped 0 pin
       delay(ClickTm);
       sr.set(Rt, LOW);  // Shifter calls the bits 0-7 we skipped 0 pin
-    } else {
-      sr.set(Rt + 1, LOW);  // Missed QA on the right side of chip2
-      delay(ClickTm);
-      sr.set(Rt + 1, HIGH);  // Shifter calls the bits 0-7 we skipped 0 pin
-      delay(ClickTm);
-      sr.set(Rt + 1, LOW);  // Shifter calls the bits 0-7 we skipped 0 pin
-    }
-#else
-    sr.set(Rt, LOW);  // PCB v2 QA corrected
-    delay(ClickTm);
-    sr.set(Rt, HIGH);  // Shifter calls the bits 0-7 we skipped 0 pin
-    delay(ClickTm);
-    sr.set(Rt, LOW);  // Shifter calls the bits 0-7 we skipped 0 pin
 #endif
+    }
   }
-  if (Lft == 0) {
-    digitalWrite(VAC, LOW);
-    delay(ClickTm);
-    digitalWrite(VAC, HIGH);
-    delay(ClickTm);
-    digitalWrite(VAC, LOW);
-  } else {
-    digitalWrite(Lft - 1, LOW);  // GP0 - 9  Version 10
-    delay(ClickTm);
-    digitalWrite(Lft - 1, HIGH);  // GP0 - 9  Version 10
-    delay(ClickTm);
-    digitalWrite(Lft - 1, LOW);  // GP0 - 9  Version 10
-  }
+  if (Lft >= 0) {  // skip right if -, it's a manual test
+    if (Lft == 0) {
+      digitalWrite(AirL, LOW);
+      delay(ClickTm);
+      digitalWrite(AirL, HIGH);
+      delay(ClickTm);
+      digitalWrite(AirL, LOW);    
+    } else {
+      digitalWrite(Lft - 1, LOW);  // GP0 - 9  Version 10
+      delay(ClickTm);
+      digitalWrite(Lft - 1, HIGH);  // GP0 - 9  Version 10
+      delay(ClickTm);
+      digitalWrite(Lft - 1, LOW);  // GP0 - 9  Version 10
+    }
+  }  
   Serial.printf("%c%u\r\n", 'F', millis());  // Odors off
 }  // End Close Odor Valves
 
@@ -757,10 +761,12 @@ void ValveTest(int rate) {  // click each valve at rate (0.1 sec units)
     delay(ratems);
     CloseOdorValves(i, i);
     delay(ratems / 2);
+    Serial.printf("# V%d",i);
   }
   tone(BUZZER_PIN, 2000, 500);
   delay(600);
   OpenAirVac();  // All 3 together
+  Serial.println("Air/Vac");
   delay(ratems);
   CloseAirVac();
   delay(ratems / 2);
@@ -970,24 +976,23 @@ void CheckNow() {
   //  handle immediate status updates to MatLab
   // Keep track of both L&R lick counts, check inter lick interval to find a burst of N licks
   // ExecuteTrial during CWT decides what to do about a burst and resets counts as needed.
-  if (NewLickLeft) {                                                   // See if it's legit and put it in the list
-                                                                       // Check for lick count for reward, NoCountErr means wrong side is OK
-                                                                       // RewEvery rewards every lick
-                                                                       // and also not insist on fast bursts, this is for training more rewards is better
+  if (NewLickLeft) {   // See if it's legit and put it in the list
+// Check for lick count for reward, NoCountErr means wrong side is OK
+// RewEvery rewards every lick
+// and also not insist on fast bursts, this is for training, more rewards is better
 // One more question: ??? Does lick on wrong side reset count even if NCE = YES                                                                       
-    if (IsFirstLick || (WasLastLickLeft &&                            // on the same side
-                         ((NewLickLeftTm - LastLickLeftTm) < MxLkTm)))  //and in time
-    {                                                                  // still in the burst OR not counting errors, add 1
+    if (IsFirstLick || (WasLastLickLeft &&                // on the same side
+       ((NewLickLeftTm - LastLickLeftTm) < MxLkTm)))      //and in time
+    {                                                     // still in the burst OR not counting errors, add 1
       LickCountL++;
     } else {  // Nope it's wrong side or too long since last lick
       LickCountL = 1;  // start over but this one counts as first
     }
-    IsFirstLick = false; // a lick that counted so not first next time
-    WasLastLickLeft = true;  // This one was left side, not right
-    LickCountR = 0;  // start over right licks
+    IsFirstLick = false;      // a lick that counted so not first next time
+    WasLastLickLeft = true;   // This one was left side, not right
+    LickCountR = 0;           // start over right licks
 // Get set for next lick timing for in burst or not
     LastLickLeftTm = NewLickLeftTm;  // Saved NewLick so can allow next ISR
-    // pause the other processor???
     NewLickLeft = false;  // clear it, allow ISR now Here or after reward?
 
     Serial.printf("L%lu\r\n", LastLickLeftTm);  // report the lick to MatLab
@@ -1162,7 +1167,7 @@ void LowerCaseCmd(char Cmd) {  // Handle lower case (immediate) commands
         break;
  //  V3.7 individual valve opening or closing for testing
       case 'v':        
-        if (val>40)
+        if (val>50)
             RewVTest(val);          // Allow slow () or fast (1000) testing of Rewards only
         else if (val>23)            // Test all valves as before
             ValveTest(val);         // Valve check Open each odor one by one then Air and Vac and rewards
@@ -1179,7 +1184,20 @@ void LowerCaseCmd(char Cmd) {  // Handle lower case (immediate) commands
         else   // 0 (or less)
             CloseAllValves();  
         break; // end 'v' 
-
+      case 'w':    // close the specified valve (or pair)
+          if (val>23)
+            CloseAllValves();
+          else if (val==23)  // close Vac
+              digitalWrite(VAC, LOW);
+          else if (val==22)
+            digitalWrite(AirR, LOW);
+          else if (val==21)            
+            digitalWrite(AirL, LOW);
+          else if (val > 10)
+            CloseOdorValves(-1,val-10);
+          else if (val>0)  
+            CloseOdorValves(val,-1);
+        break;
       case 'x':  // STOP button pressed, stop the trial, but not during reward I hope
                  // need to check and close valves, Tell MatLab to do it
                  // Emergency stop with reboot is problematic as USB connection can be lost due to Windoze way of retermining if the connection is there.

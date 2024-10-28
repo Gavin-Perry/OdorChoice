@@ -63,3 +63,8 @@ Ignore v35 it's a mistake to treat AB as error on either side
 10/23 added individual odor valve opening for testing 
 Use v1 to v20 for L1-10, R11-20, 21=Air/Vac v0 is close all
 Added 21 AirL 22 AirR 23 Air/Vac
+10/28  v39 
+Pico Added single valve closing with wN command (N=1-23) 24 or greater closes all as before with v0
+ML update 1: fixed popup queries (and app) to stay in front
+Fixed TRAINING to not need Levels file to be correct.
+Added Stop button to "paused" button click response options
