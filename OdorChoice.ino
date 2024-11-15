@@ -1,5 +1,7 @@
 // Odor Choice Trial  (C) Gavin Perry May 2024 - Oct 2024
 
+// CHECK - This is V2 config
+
 // Program to take serial input parameters from a Matlab program,
 // Perform the requested trial while collecting data
 // Return real time data to the Matlab program, no Report, let MatLab handle that
@@ -35,7 +37,8 @@
 // Stable version 
 // V31 start 10/12
 // V33 fixed GivReward for faster drops when manual as well as lick every
-
+// V40 do v33 idea with ManRew variable
+// V41 fix Air VAC order and CloseAllValves order (L then R)
 //=================================
 // TO DO
 // Simulation Test parts of code here https://wokwi.com/projects/405222044520961025
@@ -62,8 +65,8 @@
 // #include <Libraries>  use "MyLib.h" if any headers in the local dir
 #include <ShiftRegister74HC595.h>  // Shifter lib
 // #include <Arduino.h>               // in the above lib
-#define PCBv1  // Work around code for version 1 PCB. Undefine for PCBv2
-
+#define PCBv1  // Work around code for version 1 PCB AND for PCBv2 (v2C not built)
+#define VAOrder    // Fix Vac/Air pin assignment order Can be done for V1 or V2 with wiring fix at valves
 // Debugging levels set here
 #define DEBUG  // if defined, debug code is compiled in -- Comment out for no debug code
 // #define DEBUG2 // verbose, mostly for testing handshake to ML
@@ -109,9 +112,16 @@
 #define OL9 8   //
 #define OL10 9  // Last odor Left - direct pins
 // #define OR1     // Shift reg output1 (skipped zero)
+
+#ifdef VAOrder
+#define AirL 10  // (Odor 0 Left)
+#define AirR 11  //  (Odor 0 Right)
+#define VAC  12   //
+#else
 #define VAC 10   //
 #define AirL 11  // (Odor 0 Left)
 #define AirR 12  //  (Odor 0 Right)
+#endif
 
 // Right valves use '595 expansion chip with ShiftReg lib included
 //        Name      GP#       pin#   pico pin#
@@ -184,6 +194,7 @@ bool IsFirstLick = true;       // No licks yet, first of burst
 bool WasLastLickLeft = false;  // true if the last lick was on the left
 bool SyncPol = dfSyncPol;      // Sync polarity
 bool Stress = false;           // running stress test
+bool ManRew = false;          // Manual Reward delivered, skip delays
 // Trial managment flags to communicate between processors
 // The goal with so many vars is to allow some overlap
 // Probably a waste of time and can be simplified ???
@@ -619,20 +630,28 @@ void OpenAirVac() {
 
 void CloseAirVac() {
   // 10/1  added extra clicks at end of close to be sure valves close
+  // v41 add time between clicks for less current pulses
   digitalWrite(AirL, LOW);
+  delay(ClickTm);
   digitalWrite(AirR, LOW);
   delay(ClickTm);
   digitalWrite(VAC, LOW);
+  delay(ClickTm);
   digitalWrite(AirL, HIGH);
+  delay(ClickTm);
   digitalWrite(AirR, HIGH);
   delay(ClickTm);
   digitalWrite(AirL, LOW);
+  delay(ClickTm);
   digitalWrite(AirR, LOW);
+  delay(ClickTm);
+
   digitalWrite(VAC, HIGH);
   delay(ClickTm);
   digitalWrite(VAC, LOW);
   Serial.printf("%c%u\r\n", 'V', millis());  //
 }
+
 
 void OpenOdorValves(signed char Lft, signed char Rt) {
   if (Rt >= 0) {  // skip right if -, it's a manual test
@@ -641,14 +660,14 @@ void OpenOdorValves(signed char Lft, signed char Rt) {
     else {
       // Open Right mapped to '595
 
-      // work around wiring bug in board PCB v1.0
+      // work around wiring bug in board PCB v1.0 AND v2.0 :-(
 #ifdef PCBv1
       if (Rt < 8)
         sr.set(Rt, HIGH);  // Shifter calls the bits 0-7 we skipped 0 pin
       else
         sr.set(Rt + 1, HIGH);  // Missed QA on the right side of chip2
-#else                        // PCB V2
-      sr.set(Rt, HIGH);  // PCB v2 QA corrected
+#else                        // PCB V2 also has bad wires
+        sr.set(Rt, HIGH);  // PCB v2C QA corrected as intended
 #endif
     }
   }
@@ -675,7 +694,7 @@ void CloseOdorValves(char Lft, char Rt) {
       delay(ClickTm);
       digitalWrite(AirR, LOW);
     } else {
-#ifdef PCBv1  // work around wiring bug in boards 1.0
+#ifdef PCBv1  // work around wiring bug in boards v1.0 and v2.0
       if (Rt < 8) {
         sr.set(Rt, LOW);  // Shifter calls the bits 0-7 we skipped 0 pin
         delay(ClickTm);
@@ -683,18 +702,18 @@ void CloseOdorValves(char Lft, char Rt) {
         delay(ClickTm);
         sr.set(Rt, LOW);  // Shifter calls the bits 0-7 we skipped 0 pin
       } else {
-        sr.set(Rt + 1, LOW);  // Missed QA on the right side of chip2
+        sr.set(Rt + 1, LOW);  // Missed QA on the right side of chip2 or bad wiring in V2
         delay(ClickTm);
         sr.set(Rt + 1, HIGH);  // Shifter calls the bits 0-7 we skipped 0 pin
         delay(ClickTm);
         sr.set(Rt + 1, LOW);  // Shifter calls the bits 0-7 we skipped 0 pin
       }
 #else
-      sr.set(Rt, LOW);  // PCB v2 QA corrected
+      sr.set(Rt, LOW);  // PCB v2C  QA corrected (but not built)
       delay(ClickTm);
-      sr.set(Rt, HIGH);  // Shifter calls the bits 0-7 we skipped 0 pin
+      sr.set(Rt, HIGH);  //
       delay(ClickTm);
-      sr.set(Rt, LOW);  // Shifter calls the bits 0-7 we skipped 0 pin
+      sr.set(Rt, LOW);  // 
 #endif
     }
   }
@@ -717,6 +736,13 @@ void CloseOdorValves(char Lft, char Rt) {
 }  // End Close Odor Valves
 
 void CloseAllValves() {
+  for (int Lft=1; Lft<11; Lft++) {
+    digitalWrite(Lft - 1, LOW);  // GP0 - 9  Version 10
+    delay(ClickTm);
+    digitalWrite(Lft - 1, HIGH);  // GP0 - 9  Version 10
+    delay(ClickTm);
+    digitalWrite(Lft - 1, LOW);  // GP0 - 9  Version 10
+  }
   for (char Rt=1; Rt<11; Rt++)
 #ifdef PCBv1  // work around wiring bug in boards 1.0
     if (Rt < 8) {
@@ -741,13 +767,6 @@ void CloseAllValves() {
     sr.set(Rt, LOW);  // Shifter calls the bits 0-7 we skipped 0 pin
   }  
 #endif
-  for (int Lft=1; Lft<11; Lft++) {
-    digitalWrite(Lft - 1, LOW);  // GP0 - 9  Version 10
-    delay(ClickTm);
-    digitalWrite(Lft - 1, HIGH);  // GP0 - 9  Version 10
-    delay(ClickTm);
-    digitalWrite(Lft - 1, LOW);  // GP0 - 9  Version 10
-  }
   CloseAirVac();
 } 
 
@@ -860,17 +879,19 @@ void GiveReward(byte RewLoc, int Drops) {  //  RewPin, # of drops
     digitalWrite(RewLoc, HIGH);
     delayMicroseconds(DropTm * 1000);
     digitalWrite(RewLoc, LOW);
-    delayMicroseconds((DropDelay - DropTm) * 1000);  // Whole loop time is DropDelay
+    delay(DropDelay - DropTm);  // for loop total time is DropDelay
   }
-  if ((DropDelay < 1000) && (RewEvery == 0)) {  
-  // Probably a cleaning if > 1 sec so no wait also no waiting for reward every
+  if ((DropDelay < 900) && (RewEvery == 0) && ManRew==false) {  
+  // Either a cleaning if > 0.9 sec so no wait,
+  // also no extra waiting for RewEvery or Manual Rewards
     for (int i = Drops; i < MaxDrops; i++) {
       delay(DropDelay);
-#ifdef DEBUG2              // This breaks MatLab
-      Serial.print(" x");  // # of waits to Max Drops
+#ifdef DEBUG2             
+      Serial.print("#x");  // # of waits to Max Drops
 #endif
     }
   }
+  ManRew = false;  // Set it back
     // v2.8 Reset lick counts to avoid rewarding extra rewards for licking rewards
   LickCountL = 0; // Reset licks 
   LickCountR = 0; // Reset licks 
@@ -1091,27 +1112,31 @@ void LowerCaseCmd(char Cmd) {  // Handle lower case (immediate) commands
     else val = 1;                              // default value for LC commands that need a value
     switch (Cmd) {                             // do as commanded
       case 'a':
-#ifdef DEBUG
+#ifdef DEBUG2
         Serial.printf("#Manual Left A %u\r\n", val);
 #endif
+        ManRew = true;          // Manual Reward delivery, skip delays
         GiveReward(RewLeftA, val);
         break;
       case 'b':
-#ifdef DEBUG
+#ifdef DEBUG2
         Serial.printf("#Manual Left B %u\r\n", val);
 #endif
+        ManRew = true;          // Manual Reward delivery, skip delays
         GiveReward(RewLeftB, val);
         break;
       case 'c':
-#ifdef DEBUG
+#ifdef DEBUG2
         Serial.printf("#Manual Right A %u\r\n", val);
 #endif
+        ManRew = true;          // Manual Reward delivery, skip delays
         GiveReward(RewRightA, val);
         break;
       case 'd':
-#ifdef DEBUG
+#ifdef DEBUG2
         Serial.printf("#Manual Right B %u\r\n", val);
 #endif
+        ManRew = true;          // Manual Reward delivery, skip delays
         GiveReward(RewRightB, val);
         break;
       case idChar:  // 'i' Just in case out of sync and missed it elsewhere
@@ -1171,8 +1196,8 @@ void LowerCaseCmd(char Cmd) {  // Handle lower case (immediate) commands
             RewVTest(val);          // Allow slow () or fast (1000) testing of Rewards only
         else if (val>23)            // Test all valves as before
             ValveTest(val);         // Valve check Open each odor one by one then Air and Vac and rewards
-        else if (val==23)           // Vac test
-          OpenAirVac();
+        else if (val==23)           // Vac test only
+          digitalWrite(VAC, HIGH);
         else if (val==22)    
           OpenOdorValves(-1,0);    // Air right
         else if (val==21)    

@@ -68,3 +68,5 @@ Pico Added single valve closing with wN command (N=1-23) 24 or greater closes al
 ML update 1: fixed popup queries (and app) to stay in front
 Fixed TRAINING to not need Levels file to be correct.
 Added Stop button to "paused" button click response options
+10/30 V40 Fix Manual reward variable
+11/15 V41 Fix Air Vac Order to match PCB, CloseAllValves to do L then R
