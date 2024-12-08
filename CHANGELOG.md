@@ -70,3 +70,11 @@ Fixed TRAINING to not need Levels file to be correct.
 Added Stop button to "paused" button click response options
 10/30 V40 Fix Manual reward variable
 11/15 V41 Fix Air Vac Order to match PCB, CloseAllValves to do L then R
+11/20 V42-v43 rush fix various
+11/27 v44 add NewTrain Mode
+11/30 reset totaling vars at end of FinishSession
+    add Corrections for Reward valves CVO(A/B L/R)
+    
+12/7
+Add IsDone break between ChkLeft and ChkRight in CWT
+
